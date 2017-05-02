@@ -1,0 +1,243 @@
+#!/bin/bash
+
+
+vcs_is_inside_work_tree()
+{
+  git rev-parse --is-inside-work-tree &>/dev/null
+}
+
+
+vcs_is_remote_configured()
+{
+  [ "`git config remote.${REMOTE_ALIAS}.url`" != "" ] && return 0 || return 1
+}
+
+
+vcs_checkout ()
+{
+  if [ "$1" != "" ]; then echo "$1" | $FUNCNAME; else
+    local commit=`cat`
+    
+    git checkout $commit 2>/dev/null
+  fi
+}
+
+
+
+vcs_push_branch ()
+{
+  if [ "$1" != "" ]; then echo "$1" | $FUNCNAME; else
+    local branchname=`cat`
+    
+    if [ "$USE_REMOTE" == true ]; then
+      git push -u "$REMOTE_ALIAS" "$branchname" 2>/dev/null
+    fi
+  fi
+}
+
+
+
+vcs_create_branch ()
+{
+  #if [ "$1" != "" ]; then echo "$1" | $FUNCNAME; else
+    #local branch_name="`cat`"
+    local branchname=$1
+    local branchbase=$2
+    
+    local success=false
+    
+    git branch "$branchname" "$branchbase" 2>/dev/null && success=true
+    
+    if [[ "$success" == true && "$USE_REMOTE" == true ]]; then
+      success=false
+      git push -u $REMOTE_ALIAS "$branchname" 2>/dev/null && success=true
+    fi
+    
+    [ "$success" == true ] && return 0 || return 1
+  #fi
+}
+
+
+vcs_create_lightweighttag ()
+{
+  if [ "$1" != "" ]; then echo "$1" | $FUNCNAME; else
+    local tagname="`cat`"
+    
+    local success=false
+    
+    git tag "$tagname" 2>/dev/null && success=true
+    
+    if [[ "$success" == true && "$USE_REMOTE" == true ]]; then
+      success=false
+      git push $REMOTE_ALIAS "$tagname" 2>/dev/null && success=true
+    fi 
+
+    [ "$success" == true ] && return 0 || return 1
+  fi
+}
+
+
+vcs_exist_localbranch ()
+{
+  # Return 0 if the branch exists in the current repository
+  #   branch_pattern = Branch name, literal or fnmatch pattern (glob?)
+
+  local branch_pattern=$1
+  [ "`git for-each-ref --format='%(refname)' "refs/heads/$branch_pattern" \
+    2>/dev/null #do`" != "" ]
+}
+
+
+vcs_exist_branch ()
+{
+  # Return 0 if the branch exists in the current repository
+  #   branch_pattern = Branch name, literal or fnmatch pattern (glob?)
+
+  local branch_pattern=$1
+  
+  if [ "$USE_REMOTE" != true ]; then
+    vcs_exist_localbranch "$branch_pattern"
+  else
+    if [ "$USE_REMOTEFETCH" == true ]; then
+    echodbg "USE_REMOTEFETCH\n"
+      [ "`git for-each-ref --format='%(refname)' \
+        "refs/remotes/${REMOTE_ALIAS}/$branch_pattern" 2>/dev/null #do`" != "" ]
+    else
+    echodbg "USE_REMOTE\n"
+      git ls-remote --exit-code "$REMOTE_ALIAS" "refs/heads/$branch_pattern" \
+        &>/dev/null
+    fi
+  fi
+}
+
+
+vcs_exist_tag ()
+{
+  # Return 0 if the tag exists in the current repository
+  #   tag_pattern = Tag name, literal or fnmatch pattern (glob?)
+
+  local tag_pattern=$1
+  
+  if [[ "$USE_REMOTE" != true || "$USE_REMOTEFETCH" == true ]]; then
+    echodbg "USE_FETCH\n"
+    [ "`git for-each-ref --format='%(refname)' "refs/tags/$tag_pattern" \
+      2>/dev/null #do`" != "" ]
+  else
+    echodbg "USE_REMOTE\n"
+    git ls-remote --exit-code "$REMOTE_ALIAS" "refs/tags/$tag_pattern" \
+      &>/dev/null
+  fi
+}
+
+
+vcs_merge_branch_ff ()
+{
+  local srcBranch=$1
+  local dstBranch=$2
+  
+  local currentBranch=`vcs_get_currentbranch`
+  local success=false
+    
+  if [ "$dstBranch" == "" ] || [ "$dstBranch" == "$currentBranch" ]; then
+    git merge --ff-only "$srcBranch" 2>/dev/null && success=true
+    if [[ "$success" == true && "$USE_REMOTE" == true ]]; then
+      success=false
+      git push "$REMOTE_ALIAS" "$currentBranch" 2>/dev/null && success=true
+    fi
+  else
+    git fetch . "${srcBranch}:${dstBranch}" && success=true
+    if [[ "$success" == true && "$USE_REMOTE" == true ]]; then
+      success=false
+      git push "${REMOTE_ALIAS}" "${dstBranch}:${dstBranch}" 2>/dev/null \
+      && success=true
+    fi
+  fi
+  
+  [ "$success" == true ] && return 0 || return 1
+}
+
+
+vcs_get_branches ()
+{
+  # Return all the branches in the current repository
+  #   branch_pattern = Optional argument to filter the branches list
+  
+  local branch_pattern=$1
+  
+  if [ "$USE_REMOTE" != true ]; then
+    git for-each-ref --format='%(refname)' "refs/heads/$branch_pattern" \
+      2>/dev/null | sed "s%refs/heads/%%g" # do
+  else
+    if [ "$USE_REMOTEFETCH" == true ]; then
+      echodbg "USE_REMOTEFETCH\n"
+      git for-each-ref --format='%(refname)' \
+        "refs/remotes/${REMOTE_ALIAS}/$branch_pattern" 2>/dev/null \
+      | sed "s%refs/remotes/${REMOTE_ALIAS}/%%g" # do
+    else
+      echodbg "USE_REMOTE\n"
+      git ls-remote --quiet "$REMOTE_ALIAS" "refs/heads/$branch_pattern" \
+        2>/dev/null | sed "s%.*refs/heads/%%g"
+    fi
+  fi
+}
+
+
+vcs_get_tags ()
+{
+  # Return all the tags in the current repository
+  #   tag_glob = Optional argument to filter the tags list
+  
+  local tag_pattern=$1
+  
+  if [[ "$USE_REMOTE" != true || "$USE_REMOTEFETCH" == true ]]; then
+    echodbg "USE_FETCH\n"
+    git for-each-ref --format='%(refname)' "refs/tags/$tag_pattern" \
+      2>/dev/null | sed "s%refs/tags/%%g" # do
+  else
+    echodbg "USE_REMOTE\n"
+    git ls-remote --quiet "$REMOTE_ALIAS" "refs/tags/$tag_pattern" \
+      2>/dev/null | sed "s%.*refs/tags/%%g"
+  fi
+}
+
+
+vcs_get_currentbranch ()
+{
+  git rev-parse --abbrev-ref HEAD 2>/dev/null
+}
+
+
+vcs_get_currenttag ()
+{
+  git name-rev --tags --name-only HEAD 2>/dev/null
+}
+
+
+vcs_get_currenttags ()
+{
+  git for-each-ref --format='%(refname)' "refs/tags/" --points-at HEAD \
+    2>/dev/null | sed "s%refs/tags/%%g" # do  
+  #git tag --points-at HEAD
+}
+
+
+vcs_get_currentcommit ()
+{
+  git rev-parse HEAD 2>/dev/null
+}
+
+
+vcs_get_currentcheckout ()
+{
+  currentcheckout=`vcs_get_currentbranch`
+  [ "$currentcheckout" == "HEAD" ] && \
+    currentcheckout=`vcs_get_currenttag`
+  [ "$currentcheckout" == "" ] && \
+    currentcheckout=`vcs_get_currentcommit`
+  echo $currentcheckout
+} 
+
+
+
+
+

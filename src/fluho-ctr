@@ -1,0 +1,592 @@
+#!/bin/bash
+
+
+do_init()
+{
+  local version=$1
+  
+  local vmajor=`extract_vmajor $version`
+  local vminor=`extract_vminor $version`
+  local vrev=`extract_vrev $version`
+  local vstatus=`extract_vstatus $version`
+  
+  local success=false
+  
+  vmajor=${vmajor:-0}
+  vminor=${vminor:-0}
+  
+  if [ "$vrev" != "" -o "$vstatus" != "" ]; then
+    echo "\
+error: Only major.minor version can be initialized
+use: $ ${0##*/} init ${vmajor}.${vminor}" >&2
+    exit 1
+  fi
+  if ! exist_vmajor "$vmajor" development; then
+    if [ $vmajor -ne 0 -o $vminor -ne 0 ] && ! is_initialized; then
+      show_notinitialized_error
+      exit 1  
+    fi
+    init_vmajor "$vmajor" "$vminor" && success=true 
+    if [ "$success" == true ]; then 
+      echo "\
+Created branches"
+    else
+      echo "\
+error: Cannot be successfully initialized because a failure creating branches
+Does the cutting-edge branch exist and is it correctly initialized?" >&2
+      exit 1
+    fi
+    
+    if [ $vmajor -eq 0 -a $vminor -eq 0 ]; then
+      # Start versioning in a new repo
+      vcs_create_lightweighttag "v0.0.0-alpha" && \
+      vcs_create_lightweighttag "v0.0-alpha1" && \
+      vcs_create_lightweighttag "v0.0.0" && success=true
+      if [ "$success" == true ]; then 
+        echo "\
+Created tags"
+        vcs_checkout "dev/v0.0"
+      else
+        echo "\
+error: Cannot be successfully initialized because a failure creating tags" >&2
+        exit 1
+      fi
+    fi
+
+    echo "\
+v${vmajor}.${vminor} initialized"
+
+  elif ! exist_vminor "$vmajor" "$vminor" development; then
+    init_vminor "$vmajor" "$vminor" && success=true
+    
+    if [ "$success" == true ]; then 
+      echo "\
+Created branches"
+    else
+      echo "\
+error: Cannot be successfully initialized because a failure creating branches" \
+    >&2
+      exit 1
+    fi
+    
+    echo "\
+v${vmajor}.${vminor} initialized"
+
+  else
+    echo "\
+error: v${vmajor}.${vminor} already exists" >&2
+    exit 1
+  fi
+}
+
+
+do_list()
+{
+  local version=${1:-"."}
+
+  echodbg "usa ls\n"
+  echodbg "version: $version\n"
+  echodbg "format: $OPTFORMAT\n"
+  echodbg "feature: $feature_name\n"  # TODO
+  echodbg "purpose: $OPTPURPOSE\n"
+  
+  vmajor=`extract_vmajor $version`
+  vminor=`extract_vminor $version`
+  vrev=`extract_vrev $version`
+  vstatus=`extract_vstatus $version`
+  
+  
+  get_versions "$OPTPURPOSE" "$vmajor" "$vminor" "$vrev" "$vstatus"
+  
+#  case "$OPTPURPOSE" in
+#    general )
+#      get_versions "$OPTPURPOSE" "$vmajor" "$vminor" "$vrev" "$vstatus"
+#      ;;
+#    development )
+#      get_versions "$OPTPURPOSE" "$vmajor" "$vminor" "$vrev" "$vstatus"
+#      ;;
+#    testing )
+#      get_versions "$OPTPURPOSE" "$vmajor" "$vminor" "$vrev" "$vstatus"
+#      ;;
+#    production )
+#      get_versions "$OPTPURPOSE" "$vmajor" "$vminor" "$vrev" "$vstatus"
+#      ;;
+#    * )
+#      echo "\
+#error: internal. do_list() for $OPTPURPOSE" >&2
+#      exit 1
+#      ;;
+#  esac
+  
+  
+}
+
+
+do_status()
+{
+  local currentpurpose=`get_currentpurpose`
+  local output=""
+
+  if ! is_initialized; then
+    show_notinitialized_error
+    exit 1
+  fi
+  
+  case "$currentpurpose" in
+    development )
+      output="Developing"
+      ;;
+    testing )
+      output="Testing"
+      ;;
+    production )
+      output="Production"
+      ;;
+    * )
+      echo "\
+Not in a version"
+      exit 1
+      ;;
+  esac
+  
+  local currentversion=`get_currentversion`
+  
+  output="${output}, on version $currentversion"
+  
+  case "`get_vtype $currentversion`" in
+    cuttingedge )
+      output="${output}, type cutting-edge  (head in major and head in minor)"
+      ;;
+    maintenance1 )
+      output="${output}, type maintenance-1  (only head in minor)"
+      ;;
+    maintenance2 )
+      output="${output}, type maintenance-2  (not head in minor)"
+      ;;
+  esac
+  
+  if [[ "$currentpurpose" == "testing" || "$currentpurpose" == "production" ]];
+    then
+    if is_latestvrev $currentversion; then 
+      output="${output}, in latest revision"
+    else
+      output="${output}, not in latest revision"
+    fi
+  fi
+  
+  echo $output
+  
+  local vmajor=`extract_vmajor $currentversion`
+  local vminor=`extract_vminor $currentversion`
+  
+  local latestversion_test=`get_latestversion testing "$vmajor" "$vminor"` 
+  if [ "$latestversion_test" != "" ]; then
+    echo "\
+Latest revision of v${vmajor}.${vminor} released for testing: $latestversion_test"
+  else
+    echo "\
+Not revision of v${vmajor}.${vminor} released for testing yet."
+  fi
+  
+  local latestversion_prod=`get_latestversion production "$vmajor" "$vminor"`
+  if [ "$latestversion_prod" != "" ]; then
+    echo "\
+Latest revision of v${vmajor}.${vminor} released for production: $latestversion_prod"
+  else
+    echo "\
+Not revision of v${vmajor}.${vminor} released for production yet."
+  fi
+
+}
+
+
+do_checkout()
+{
+  local version=${1:-"."}
+
+  echodbg "version: $version\n"
+  echodbg "feature: $feature_name\n"  # TODO
+  echodbg "init: $OPTINIT\n"
+  echodbg "purpose: $OPTPURPOSE\n"
+  
+  vmajor=`extract_vmajor $version`
+  vminor=`extract_vminor $version`
+  vrev=`extract_vrev $version`
+  vstatus=`extract_vstatus $version`
+      
+  case $OPTPURPOSE in
+    development )
+      if [ "$vmajor" == "" ] || [ "$vminor" == "" ]; then
+        
+        # There was empty needed field
+        echo "\
+error: Cersion not completely specified as {major}.{minor}" >&2
+        show_checkoutversion_suggestion development "$vmajor" "$vminor"
+        exit 1
+        
+      else
+      
+        # There was no empty needed field
+        if [ "$vrev" != "" ] || [ "$vstatus" != "" ]; then
+          echo "\
+error: Development version can only be specified as {major}.{minor}
+To checkout a version for testing or production, use a command like this:
+$ ${0##*/} checkout v{major}.{minor}.{rev}-(alpha|beta|rc)
+or
+$ ${0##*/} checkout v{major}.{minor}.{rev}-stable" >&2
+          exit 1
+        fi
+        if ! exist_version "$OPTPURPOSE" "${vmajor}" "${vminor}"; then
+          echo "\
+error: v${vmajor}.${vminor} did not match any existing version for development.
+To checkout and initialize it as a new version, use:
+$ ${0##*/} checkout v${vmajor}.${vminor} --init" >&2
+          exit 1
+        else
+          echo "\
+Checking out to branch 'dev/v${vmajor}.${vminor}'"
+          vcs_checkout "dev/v${vmajor}.${vminor}"
+        fi
+        
+      fi
+      ;;
+    
+    testing )
+      if [ "$vmajor" == "" ] || [ "$vminor" == "" ] || [ "$vrev" == "" ] || \
+        [ "$vstatus" == "" ]; then
+        
+        # There was empty field
+        echo "\
+error: Version not completely specified as {major}.{minor}.{rev}-{status}" >&2
+        show_checkoutversion_suggestion testing "$vmajor" "$vminor" \
+          "$vrev" "$vstatus"
+        exit 1
+                
+      else
+      
+        # There was no empty field
+        if ! exist_version "$OPTPURPOSE" "${vmajor}" "${vminor}" "${vrev}" \
+          "${vstatus}"; then
+          echo "\
+error: v${vmajor}.${vminor}.${vrev}-${vstatus} did not match any released \
+version for testing." >&2
+          exit 1
+        else
+          echo "\
+Checking out to the version: v${vmajor}.${vminor}.${vrev}-${vstatus}"
+          vcs_checkout "v${vmajor}.${vminor}.${vrev}-${vstatus}"
+        fi
+        
+      fi
+      ;;
+      
+    production )
+    
+      if [[ "$vmajor" == "" || "$vminor" == "" || "$vrev" == "" || \
+        ( "$vstatus" != "" && "$vstatus" != "stable" ) ]]; then
+        # There was empty needed field or vstatus conflict
+        
+        echo "\
+Automatically choosing the latest version in production for given data."
+      
+        latestversion=`get_latestversion production \
+          "${vmajor}" "${vminor}" "${vrev}" "${vstatus}"`
+
+        if [ "$latestversion" == "" ]; then
+          echo "\
+error: Given data did not match any released version for production." >&2
+          exit 1
+        else
+          echo "\
+Checking out to the version: v${latestversion}"
+          vcs_checkout "v${latestversion}"
+        fi
+        
+      else
+        # There was no empty field
+      
+        if ! exist_version "$OPTPURPOSE" "${vmajor}" "${vminor}" "${vrev}" \
+          stable; then
+          echo "\
+error: v${vmajor}.${vminor}.${vrev}-stable did not match any released \
+version for production." >&2
+          exit 1
+        else
+          echo "\
+Checking out to the version: v${vmajor}.${vminor}.${vrev}-stable"
+          vcs_checkout "v${vmajor}.${vminor}.${vrev}-stable"
+        fi
+        
+      fi
+      ;;
+    
+    "" )
+      echo "\
+error: Version must be specified" >&2
+      show_checkoutversion_suggestion development "$vmajor" "$vminor" \
+          "$vrev" "$vstatus"
+      show_checkoutversion_suggestion testing "$vmajor" "$vminor" \
+          "$vrev" "$vstatus"
+      show_checkoutversion_suggestion production "$vmajor" "$vminor" \
+          "$vrev" "$vstatus"
+      ;;
+    
+    * )
+      echo "\
+error: internal: Unknown purpose to checkout version" >&2
+      exit 1
+      ;;
+  esac
+  
+}
+
+
+do_release()
+{
+  local version=${1:-"."}
+
+  echodbg "usa release\n"
+  echodbg "feature: $feature_name\n"  # TODO
+
+  local vmajor=`extract_vmajor $version`
+  local vminor=`extract_vminor $version`
+  local vrev=`extract_vrev $version`
+  local vstatus=`extract_vstatus $version`
+  
+  if [ "$vmajor" == "" ] || [ "$vminor" == "" ] || [ "$vrev" == "" ] || \
+    [ "$vstatus" == "" ]; then
+    vmajor=$(get_currentvmajor); vmajor=${vmajor:-0}
+    vminor=$(get_currentvminor); vminor=${vminor:-0}
+    nextvrev=$(get_nextvrev "$vmajor" "$vminor")
+    latestvstatus=$(get_latestvstatus "$vmajor" "$vminor" general)
+    latestvstatus=${latestvstatus:-alpha}
+    echo "\
+error: Specify version to release. For example:
+$ ${0##*/} release v${vmajor}.${vminor}.${nextvrev}-$latestvstatus" >&2
+    exit 1
+  fi
+      
+  case $vstatus in
+    alpha | beta | rc )  # Release for testing
+      # Comprobacion de HEAD en rama de desarrollo de la version a liberar
+      if [ "`get_currentpurpose`" != "development" ] || \
+        [ "`get_currentversion`" != "v${vmajor}.${vminor}" ]; then
+        echo "\
+error: Not in developing stage for v${vmajor}.${vminor}">&2
+        show_checkoutversion_suggestion development "$vmajor" "$vminor"
+        exit 1
+      fi
+      # Comprobacion de no existencia de la version a liberar
+      if exist_version testing "$vmajor" "$vminor" "$vrev" "$vstatus"; then
+        echo "\
+error: v${vmajor}.${vminor}.${vrev}-${vstatus} already exists" >&2
+        exit 1
+      fi
+      # Comprobacion de numero de revision correcto
+      latestvrev=`get_latestvrev "$vmajor" "$vminor" general`
+      nextvrev=$(get_nextvrev "$vmajor" "$vminor")
+      if [ $nextvrev -ne $vrev ]; then
+        echo "\
+error: Given revision number (${vrev}) must be consecutive to the latest one. Use:
+
+      $ ${0##*/} release v${vmajor}.${vminor}.${nextvrev}-${vstatus}" >&2
+        exit 1
+      fi 
+      # Comprobacion de no retroceso en el estado cuando no admitido
+      if [ "$vstatus" != "rc" ] && \
+        is_pastvstatus "$vmajor" "$vminor" "$vstatus"; then
+        echo "\
+error: Cannot back to a past status (except to rc). Use at least \
+'`get_latestvstatus "$vmajor" "$vminor"`'" >&2
+        exit 1
+      fi
+      
+      show_releasefortesting_warning
+      
+      echo -n "\
+Are you sure you want to release the version \
+${vmajor}.${vminor}.${vrev}-${vstatus} [yes/No]? "; read option
+      if isYes "${option}"; then 
+        echo "v${vmajor}.${vminor}.${vrev}-${vstatus} will be released"
+      else
+        echo "\
+Canceled!"
+        exit 2
+      fi
+      
+      # Creación de la etiqueta v{major}.{minor}.{rev}-{status}   ◄◄◄
+      vcs_create_lightweighttag "v${vmajor}.${vminor}.${vrev}-${vstatus}" && \
+      # Creación de la etiqueta v{major}.{minor}-{status}{status_rev}
+      local vstatusrev=`get_nextvstatusrev "$vmajor" "$vminor" "$vstatus"` && \
+      vcs_create_lightweighttag "v${vmajor}.${vminor}-${vstatus}${vstatusrev}" \
+      && echo "\
+Created tags" || ( echo "\
+error: Cannot be successfully released because a failure creating tags" >&2; \
+        exit 1 )
+
+      case "`get_vtype $version`" in
+        cuttingedge )
+          # Se suben los cambios locales de la rama dev/v{major}.{minor}, si hay remote
+          # Se fusiona la rama dev/v{major}.{minor} con la rama test/v{major}.{minor} con fast-forward
+          # Se fusiona la rama test/v{major}.{minor} con la rama test/v{major} con fast-forward
+          # Se fusiona la rama test/v{major} con la rama test/cutting-edge con fast-forward
+          vcs_push_branch "dev/v${vmajor}.${vminor}" \
+          && vcs_merge_branch_ff "dev/v${vmajor}.${vminor}" \
+            "test/v${vmajor}.${vminor}" \
+          && vcs_merge_branch_ff "test/v${vmajor}.${vminor}" \
+            "test/v${vmajor}" \
+          && vcs_merge_branch_ff "test/v${vmajor}" "test/cutting-edge" \
+          && echo "\
+Merged branches" || ( echo "\
+error: Cannot be successfully released because a failure merging branches" >&2;\
+            exit 1 )
+          ;;
+        maintenance1 )
+          # Se suben los cambios locales de la rama dev/v{major}.{minor}, si hay remote
+          # Se fusiona la rama dev/v{major}.{minor} con la rama test/v{major}.{minor} con fast-forward
+          # Se fusiona la rama test/v{major}.{minor} con la rama test/v{major} con fast-forward
+          vcs_push_branch "dev/v${vmajor}.${vminor}" \
+          && vcs_merge_branch_ff "dev/v${vmajor}.${vminor}" \
+            "test/v${vmajor}.${vminor}" \
+          && vcs_merge_branch_ff "test/v${vmajor}.${vminor}" \
+            "test/v${vmajor}" \
+          && echo "\
+Merged branches" || ( echo "\
+error: Cannot be successfully released because a failure merging branches" >&2;\
+            exit 1 )
+          ;;
+        maintenance2 )
+          # Se suben los cambios locales de la rama dev/v{major}.{minor}, si hay remote
+          # Se fusiona la rama dev/v{major}.{minor} con la rama test/v{major}.{minor} con fast-forward
+          vcs_push_branch "dev/v${vmajor}.${vminor}" \
+          && vcs_merge_branch_ff "dev/v${vmajor}.${vminor}" \
+            "test/v${vmajor}.${vminor}" \
+          && echo "\
+Merged branches" || ( echo "\
+error: Cannot be successfully released because a failure merging branches" >&2;\
+            exit 1 )
+          ;;
+      esac
+      ;;
+
+    stable )  # Release for production
+      # Comprobacion de HEAD en version rc correspondiente a version a liberar
+      if [ "`get_currentversion`" != "v${vmajor}.${vminor}.${vrev}-rc" ]; then
+        echo "\
+error: Not in rc version v${vmajor}.${vminor}.${vrev}-rc">&2
+        show_checkoutversion_suggestion testing "$vmajor" "$vminor" "$vrev" rc
+        exit 1
+      fi
+      # Comprobacion de no existencia de la version a liberar
+      if exist_version production "$vmajor" "$vminor" "$vrev" "$vstatus"; then
+        echo "\
+error: v${vmajor}.${vminor}.${vrev}-${vstatus} already exists" >&2
+        exit 1
+      fi
+      
+      show_releaseforproduction_warning
+
+      # Comprobacion de si se libera una revision posterior a la ultima liberada
+      latestvrev=`get_latestvrev "$vmajor" "$vminor" production`
+      if [[ "$latestvrev" != "" && $latestvrev -gt $vrev ]]; then
+        echo "\
+note: You are releasing an older rev than the latest released for production"
+      fi 
+      
+      echo -n "\
+Are you sure you want to release the version \
+${vmajor}.${vminor}.${vrev}-${vstatus} [yes/No]? "; read option
+      if isYes "${option}"; then 
+        echo "v${vmajor}.${vminor}.${vrev}-${vstatus} will be released"
+      else
+        echo "\
+Canceled!"
+        exit 2
+      fi
+      
+      # Creación de la etiqueta v{major}.{minor}.{rev}-{status}   ◄◄◄
+      vcs_create_lightweighttag "v${vmajor}.${vminor}.${vrev}-${vstatus}" && \
+      # Creación de la etiqueta v{major}.{minor}.{rev}
+      vcs_create_lightweighttag "v${vmajor}.${vminor}.${vrev}" && tagok=true
+      # Creación de la etiqueta v{major}.{minor}-{status}{status_rev}
+      if [[ "$tagok" == true && "$latestvrev" != "" && $latestvrev -lt $vrev ]]
+      then
+        tagok=false
+        local vstatusrev=`get_nextvstatusrev "$vmajor" "$vminor" "$vstatus"` && \
+        vcs_create_lightweighttag \
+          "v${vmajor}.${vminor}-${vstatus}${vstatusrev}" && tagok=true
+      fi
+      if [ "$tagok" == true ]; then echo "\
+Created tags"
+      else echo "\
+error: Cannot be successfully released because a failure creating tags" >&2
+        exit 1
+      fi
+
+      if [[ "$latestvrev" == "" || $latestvrev -lt $vrev ]]; then
+        case "`get_vtype $version`" in
+          cuttingedge )
+            # Se fusiona hasta la etiqueta v{major}.{minor}.{rev}-rc con la rama v{major}.{minor} con fast-forward
+            vcs_merge_branch_ff "v${vmajor}.${vminor}.${vrev}-${vstatus}" \
+              "v${vmajor}.${vminor}" && \
+            # Se fusiona la rama v{major}.{minor} con la rama v{major} con fast-forward
+            vcs_merge_branch_ff "v${vmajor}.${vminor}" "v${vmajor}" && \
+            # Se fusiona la rama v{major} con la rama cutting-edge con fast-forward
+            vcs_merge_branch_ff "v${vmajor}" "$CUTTINGEDGE_BRANCH" && \
+            echo "\
+Merged branches" || ( echo "\
+error: Cannot be successfully released because a failure merging branches" >&2;\
+              exit 1 )
+            ;;
+          maintenance1 )
+            # Se fusiona hasta la etiqueta v{major}.{minor}.{rev}-rc con la rama v{major}.{minor} con fast-forward
+            vcs_merge_branch_ff "v${vmajor}.${vminor}.${vrev}-${vstatus}" \
+              "v${vmajor}.${vminor}" && \
+            # Se fusiona la rama v{major}.{minor} con la rama v{major} con fast-forward
+            vcs_merge_branch_ff "v${vmajor}.${vminor}" "v${vmajor}" && \
+            echo "\
+Merged branches" || ( echo "\
+error: Cannot be successfully released because a failure merging branches" >&2;\
+              exit 1 )
+            ;;
+          maintenance2 )
+            # Se fusiona hasta la etiqueta v{major}.{minor}.{rev}-rc con la rama v{major}.{minor} con fast-forward
+            vcs_merge_branch_ff "v${vmajor}.${vminor}.${vrev}-${vstatus}" \
+              "v${vmajor}.${vminor}" && \
+            echo "\
+Merged branches" || ( echo "\
+error: Cannot be successfully released because a failure merging branches" >&2;\
+              exit 1 )
+            ;;
+        esac
+      fi 
+      ;;
+      
+    * )
+      echo "\
+error: Invalid version number. Version status must be (alpha|beta|rc|stable).">&2
+      ;;
+    esac
+}
+
+
+do_sync()
+{
+  #TODO
+  if [ "$USE_REMOTE" == true ]; then
+    echo "Fetching updated data from remote repository..."
+    git fetch $REMOTE_ALIAS --tags
+    echo "Pushing branches of development versions..."
+    git push $REMOTE_ALIAS "dev/v*0"
+    echo "Pushing branches of testing versions..."
+    git push $REMOTE_ALIAS "test/v[0-9]*\.[0-9]*:test/v[0-9]*\.[0-9]*"
+    echo "Pushing branches of production versions..."
+    git push $REMOTE_ALIAS "v[0-9]*\.[0-9]*:"
+    echo "Pushing tags of released versions..."
+    git push $REMOTE_ALIAS --tags
+  fi
+}
+
+
+
+

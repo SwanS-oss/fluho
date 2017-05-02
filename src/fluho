@@ -1,0 +1,452 @@
+#!/bin/bash
+
+VERSION="1.0.0-alpha"
+
+USE_REMOTE=true 
+USE_REMOTEFETCH=true  # Perform checking over remote using fetched local refs 
+REMOTE_ALIAS="origin"
+
+CUTTINGEDGE_BRANCH=master
+
+ENABLE_DBG=false
+
+getThisScriptPwd() {
+  # GLOBAL OUT:
+  #  THIS_SCRIPT_PWD
+  
+  local src
+  local path
+  
+  src="${BASH_SOURCE[0]}"
+  while [ -h "$src" ]; do # resolve $src until the file is no longer a symlink
+    path="$( cd -P "$( dirname "$src" )" && pwd )"
+    src="$(readlink "$src")"
+    [[ $src != /* ]] && src="$path/$src"
+  done
+  
+  THIS_SCRIPT_PWD="$( cd -P "$( dirname "$src" )" && pwd )"
+}; getThisScriptPwd
+
+
+
+
+###############################################################################
+# INCLUDES
+
+#. ${THIS_SCRIPT_PWD}/upvars-bash
+. ${THIS_SCRIPT_PWD}/tools-bash
+. ${THIS_SCRIPT_PWD}/fluho-ctr
+. ${THIS_SCRIPT_PWD}/fluho-mdl
+. ${THIS_SCRIPT_PWD}/fluho-mdl-git
+
+
+
+
+##############################################################################
+# OTHER FUNCTIONS
+
+show_help ()
+{
+  echo "\
+Usage: ${0##*/} {action} [arguments | options]
+
+Actions:
+  init [version_number] [options]
+    Create tags and branches of a new version.
+    [version_number]
+      Use format [v]{major}.{minor}
+      If minor or major are omitted, then zero is considered
+      Omit version_number to start versioning in a new repo.
+    [options]
+      --feature {feature_name}
+        Create branches for the development of a specific feature of the version
+  list [options]
+    Show all the available versions.
+    [options]
+      --format (base|alternative). Default: base
+      --purpose {development|testing|production}
+        Limit the list to versions for development, testing or production. 
+  status
+    Show info about the current version: flow stage, version number, head in 
+    major, head in minor, latest revision released.
+  checkout {version_number} [options]
+    Updates files in the working tree to match the version
+    {version_number}
+      For development version, use format [v]{major}.{minor}
+      For testing version, use format [v]{major}.{minor}.{revision}-{status}
+      For production version, use format [v]{major}.{minor}.{revision}[-stable]
+      If status, revision or minor are omitted, then the latest one will be 
+      suggested.
+    [options]
+      --feature {feature_name}
+        Set to develop a specific feature of the version
+      --init 
+        Create the version (major, minor) or feature if does not exist
+      --purpose {development|testing|production}
+        Select the purpose is the version for. 
+        This allow to obtain a suggestion of the latest version (major, minor 
+        or revision) suitable for a purpose. Default: development
+  release {version_number} [options]
+    Merge the current dev branch to the test branch(s) for alpha, beta and rc 
+    state, or the test branch to the production branch for stable state, 
+    create tags for the version and execute the extra actions for releasing. 
+    New revision number is automatically generated for the current 
+    major.minor version (revision numbers cannot be skipped).
+    {version_number}
+      Format: [v]{major}.{minor}.{revision}-{status}
+    [options]
+      --feature {feature_name}
+        Finish feature development and merge the feature code to the version.
+        It does not release the version itself."
+  [ "$USE_REMOTE" == true ] && echo "\
+  sync
+    Synchronize local versions with remote repository"
+  echo "\
+  help
+    Show this help
+    
+General arguments:
+  --remote {remote_alias}
+    Force to perform actions in the remote repository with alias {remote_alias}
+  --noremote
+    Force to perform actions only locally
+"
+}
+
+
+show_option_error()
+{
+  echo "\
+error: Bad argument. Take a look at: $ ${0##*/} --help" >&2
+}
+
+
+show_notinitialized_error()
+{
+  echo "\
+error: Not under fluho version control. Use:
+$ ${0##*/} init" >&2
+}
+
+
+show_versionformat_error()
+{
+  local version=$1
+  echo "\
+error: Version '$version' has invalid format.
+Use integer for major, minor and rev. Use alpha|beta|rc|stable for status.
+For listing also can leave a field empty as a wildcard (ex. v1..-alpha)" >&2
+}
+
+
+show_releasefortesting_warning()
+{
+  echo 
+}
+
+
+show_releaseforproduction_warning()
+{
+  echo 
+}
+
+
+
+
+show_checkoutversion_suggestion()
+{
+  local purpose=$1
+  local vmajor=$2
+  local vminor=$3
+  local vrev=$4
+  local vstatus=$5
+  
+  latestversion=`get_latestversion "$purpose" "$vmajor" "$vminor" "$vrev" \
+    "${vstatus}"`
+  
+  if [ "$latestversion" != "" ]; then
+  
+    matchingtxt=" matching the given data"
+    latesttxt=" latest"
+    [ "$vmajor" == "" ] && matchingtxt=""
+    [[ "$purpose" == "development" && "$vmajor" != "" && "$vminor" != "" ]] && \
+      latesttxt=""
+    [[ ( "$purpose" == "testing" || "$purpose" == "production" ) && \
+      "$vmajor" != "" && "$vminor" != "" && "$vrev" != "" && \
+      "$vstatus" != "" ]] && \
+      latesttxt=""
+      
+    echo "\
+To checkout to the${latesttxt} version for ${purpose}${matchingtxt}, use:
+$ ${0##*/} checkout v${latestversion}"
+
+  else
+  
+    if [[ 
+      ( "$purpose" == "development" && "$vmajor" != "" && "$vminor" != "" ) || \
+      ( ( "$purpose" == "testing" || "$purpose" == "production" ) && \
+      "$vmajor" != "" && "$vminor" != "" && "$vrev" != "" && "$vstatus" != "" )\
+      ]]
+      then
+      echo "\
+To checkout to the version for ${purpose} matching the given data, use:
+$ ${0##*/} checkout v${vmajor}.${vminor}.${vrev}-${vstatus}
+note: v${vmajor}.${vminor}.${vrev}-${vstatus} does NOT currently exist."
+    elif [ "$vmajor" != "" ]; then
+      echo "\
+Given data did not match any version released for ${purpose}." >&2
+    else
+      echo "\
+Not version released for $purpose yet."
+    fi  
+    
+  fi  
+
+}
+
+
+
+
+validate_version()
+{
+  if [ "$1" != "" ]; then echo "$1" | $FUNCNAME; else
+    local version=`cat`
+    
+    local vmajor=`extract_vmajor $version`
+    local vminor=`extract_vminor $version`
+    local vrev=`extract_vrev $version`
+    local vstatus=`extract_vstatus $version`
+    
+    if [ "$vmajor" != "" ] && ! `isInteger $vmajor`; then return 1; fi 
+    [ "$vminor" != "" ] && ! `isInteger $vminor` && return 1 
+    [ "$vrev" != "" ] && ! `isInteger $vrev` && return 1
+    [[ "$vstatus" != "" && ! "$vstatus" =~ ^(alpha|beta|rc|stable)$ ]] && \
+      return 1
+      
+    return 0 
+  fi  
+}
+
+
+
+
+extract_vmajor()
+{
+  [ "$1" != "" ] && echo "$1" | $FUNCNAME || \
+  sed 's%^*/%%;s/^v//;s/-.*//' | awk 'BEGIN { FS = "." } ; {print $1}'
+}
+
+
+extract_vminor()
+{
+  [ "$1" != "" ] && echo "$1" | $FUNCNAME || \
+  sed 's%^*/%%;s/^v//;s/-.*//' | awk 'BEGIN { FS = "." } ; {print $2}'
+}
+
+
+extract_vrev()
+{
+  [ "$1" != "" ] && echo "$1" | $FUNCNAME || \
+  sed 's%^*/%%;s/^v//;s/-.*//' | awk 'BEGIN { FS = "." } ; {print $3}'
+}
+
+
+extract_vstatus()
+{
+  [ "$1" != "" ] && echo "$1" | $FUNCNAME || \
+  sed 's%^*/%%;s/^v//' | awk 'BEGIN { FS = "-" } ; {print $2}'
+}
+
+
+extract_vpurpose()
+{
+  if [ "$1" != "" ]; then echo "$1" | $FUNCNAME; else
+    local version=`cat`
+
+    local vmajor=`extract_vmajor $version`
+    local vminor=`extract_vminor $version`
+    local vrev=`extract_vrev $version`
+    local vstatus=`extract_vstatus $version`
+    
+    if [ "$vmajor" != "" ] && [ "$vminor" != "" ] && [ "$vrev" != "" ] && [ "$vstatus" != "" ]; then
+      case $vstatus in
+        alpha | beta | rc ) echo "testing";;
+        stable ) echo "production";;
+        * ) echo "";;
+      esac
+    elif [ "$vmajor" != "" ] && [ "$vminor" != "" ] && [ "$vrev" != "" ]; then
+      echo "production"
+    elif [ "$vmajor" != "" ] && [ "$vminor" != "" ]; then
+      echo "development"
+    else
+      echo ""
+    fi   
+  fi
+}
+
+
+
+
+complete_purposename()
+{
+  if [ "$1" != "" ]; then echo "$1" | $FUNCNAME; else
+    local purposename=`cat`
+    
+    case $purposename in
+      d* ) echo "development";;
+      t* ) echo "testing";;
+      p* ) echo "production";;
+    esac
+  fi
+
+}
+
+
+
+
+###############################################################################
+# MAIN
+
+main()
+{
+  # Grab options
+
+  OPTINIT=false
+  OPTFEATURE=false
+  OPTFORMAT=base  # base=base  alternative=alt
+  OPTPURPOSE=""  # development, testing, production
+  
+  if [ $# -eq 0 ]; then
+    show_help
+    exit 1
+  fi
+
+  if ! vcs_is_inside_work_tree; then
+    echo "\
+error: Not under a version control system" >&2
+    exit 1
+  fi
+  
+  args=`getopt -o : --long \
+  init,feature:,format:,noremote,purpose:,remote:,version,help -- "$@"`
+  if [ $? -ne 0 ]; then
+    show_option_error
+    exit 1
+  fi
+  eval set -- "$args"
+
+
+  while true ; do
+    case "$1" in
+      --init )          OPTINIT=true
+                        ;;
+      --feature )       shift
+                        OPTFEATURE=1
+                        feature_name=$1
+                        ;;
+      --format )        shift
+                        case "$1" in
+                          base )        OPTFORMAT=base
+                                        ;;
+                          alternative ) OPTFORMAT=alt
+                                        ;;
+                        esac
+                        ;;
+      --noremote )      USE_REMOTE=false
+                        ;;
+      --remote )        shift
+                        USE_REMOTE=true
+                        REMOTE_ALIAS=$1
+                        ;;
+      --purpose )       shift
+                        OPTPURPOSE=`complete_purposename $1`
+                        ;;
+      --version )       echo "fluho version $VERSION"; exit 0
+                        ;;
+      --help )          show_help; exit 0
+                        ;;
+      --)               shift ; break
+                        ;;
+      *)                echo "Internal error!" ; exit 1
+    esac
+    shift
+  done
+
+  if [ "$USE_REMOTE" == true ] && ! vcs_is_remote_configured; then
+    echo "\
+warning: Remote repository '$REMOTE_ALIAS' not configured. Now working locally.
+To avoid this message, use --noremote argument or set USE_REMOTE config to false
+" >&2
+    USE_REMOTE=false
+  fi
+
+  while [ $# -ge 1 ]; do
+    case "$1" in
+      init )          shift
+                      local version=${1:-.}
+                      if ! `validate_version $version`; then
+                        show_versionformat_error $version
+                        exit 1
+                      fi
+                      do_init $version
+                      ;;
+      list | ls | version ) shift
+                      local version=${1:-.}
+                      if ! `validate_version $version`; then
+                        show_versionformat_error $version
+                        exit 1
+                      fi
+                      OPTPURPOSE=${OPTPURPOSE:-general}
+                      do_list $version
+                      ;;
+      status | st )   do_status
+                      ;;
+      checkout | co ) shift
+                      local version=${1:-.}
+                      if ! `validate_version $version`; then
+                        show_versionformat_error $version
+                        exit 1
+                      fi
+                      OPTPURPOSE=${OPTPURPOSE:-`extract_vpurpose $version`}
+                      if [ $OPTINIT == true ]; then
+                        local vmajor=`extract_vmajor $version`
+                        local vminor=`extract_vminor $version`
+                        version="${vmajor:-0}.${vminor:-0}"
+                        OPTPURPOSE=${OPTPURPOSE:-development}
+                        if [ "$OPTPURPOSE" == "development" ]; then
+                          do_init $version
+                          do_checkout $version
+                        else
+                          echo "\
+error: Unadmitted purpose. Only version for development can be initialized." >&2
+                        fi
+                      else
+                        do_checkout $version
+                      fi
+                      ;;
+      release | re )  shift
+                      local version=${1:-.}
+                      if ! `validate_version $version`; then
+                        show_versionformat_error $version
+                        exit 1
+                      fi
+                      do_release $version
+                      ;;
+      sync )          do_sync; exit 0
+                      ;;
+      help )          show_help; exit 0
+                      ;;
+      --)             shift ; break
+                      ;;
+      *)              show_option_error
+                      exit 1
+    esac
+    shift
+  done
+
+}
+
+
+main "$@"
+
+
