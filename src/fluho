@@ -135,7 +135,7 @@ show_versionformat_error()
   echo "\
 error: Version '$version' has invalid format.
 Use integer for major, minor and rev. Use alpha|beta|rc|stable for status.
-For listing also can leave a field empty as a wildcard (ex. v1..-alpha)" >&2
+For listing, leave a field empty as a wildcard (ex. v1..-alpha)" >&2
 }
 
 
