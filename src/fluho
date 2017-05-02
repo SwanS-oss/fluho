@@ -117,7 +117,9 @@ General arguments:
 show_option_error()
 {
   echo "\
-error: Bad argument. Take a look at: $ ${0##*/} --help" >&2
+error: Bad argument. Take a look at:
+
+      $ ${0##*/} --help" >&2
 }
 
 
@@ -125,7 +127,8 @@ show_notinitialized_error()
 {
   echo "\
 error: Not under fluho version control. Use:
-$ ${0##*/} init" >&2
+
+      $ ${0##*/} init" >&2
 }
 
 
@@ -178,7 +181,8 @@ show_checkoutversion_suggestion()
       
     echo "\
 To checkout to the${latesttxt} version for ${purpose}${matchingtxt}, use:
-$ ${0##*/} checkout v${latestversion}"
+
+      $ ${0##*/} checkout v${latestversion}"
 
   else
   
@@ -190,7 +194,9 @@ $ ${0##*/} checkout v${latestversion}"
       then
       echo "\
 To checkout to the version for ${purpose} matching the given data, use:
-$ ${0##*/} checkout v${vmajor}.${vminor}.${vrev}-${vstatus}
+
+    $ ${0##*/} checkout v${vmajor}.${vminor}.${vrev}-${vstatus}
+
 note: v${vmajor}.${vminor}.${vrev}-${vstatus} does NOT currently exist."
     elif [ "$vmajor" != "" ]; then
       echo "\

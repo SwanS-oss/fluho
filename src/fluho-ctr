@@ -17,8 +17,9 @@ do_init()
   
   if [ "$vrev" != "" -o "$vstatus" != "" ]; then
     echo "\
-error: Only major.minor version can be initialized
-use: $ ${0##*/} init ${vmajor}.${vminor}" >&2
+error: Only major.minor version can be initialized. Use:
+
+      $ ${0##*/} init ${vmajor}.${vminor}" >&2
     exit 1
   fi
   if ! exist_vmajor "$vmajor" development; then
@@ -250,7 +251,8 @@ $ ${0##*/} checkout v{major}.{minor}.{rev}-stable" >&2
           echo "\
 error: v${vmajor}.${vminor} did not match any existing version for development.
 To checkout and initialize it as a new version, use:
-$ ${0##*/} checkout v${vmajor}.${vminor} --init" >&2
+
+      $ ${0##*/} checkout v${vmajor}.${vminor} --init" >&2
           exit 1
         else
           echo "\
@@ -372,7 +374,8 @@ do_release()
     latestvstatus=${latestvstatus:-alpha}
     echo "\
 error: Specify version to release. For example:
-$ ${0##*/} release v${vmajor}.${vminor}.${nextvrev}-$latestvstatus" >&2
+
+      $ ${0##*/} release v${vmajor}.${vminor}.${nextvrev}-$latestvstatus" >&2
     exit 1
   fi
       
