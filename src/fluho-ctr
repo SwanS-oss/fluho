@@ -586,18 +586,19 @@ error: Invalid version number. Version status must be (alpha|beta|rc|stable).">&
 do_sync()
 {
   #TODO
-  if [ "$USE_REMOTE" == true ]; then
-    echo "Fetching updated data from remote repository..."
-    git fetch $REMOTE_ALIAS --tags
-    echo "Pushing branches of development versions..."
-    git push $REMOTE_ALIAS "dev/v*0"
-    echo "Pushing branches of testing versions..."
-    git push $REMOTE_ALIAS "test/v[0-9]*\.[0-9]*:test/v[0-9]*\.[0-9]*"
-    echo "Pushing branches of production versions..."
-    git push $REMOTE_ALIAS "v[0-9]*\.[0-9]*:"
-    echo "Pushing tags of released versions..."
-    git push $REMOTE_ALIAS --tags
-  fi
+  echo "Feature To Do..."
+#  if [ "$USE_REMOTE" == true ]; then
+#    echo "Fetching updated data from remote repository..."
+#    git fetch $REMOTE_ALIAS --tags
+#    echo "Pushing branches of development versions..."
+#    git push $REMOTE_ALIAS "dev/v*0"
+#    echo "Pushing branches of testing versions..."
+#    git push $REMOTE_ALIAS "test/v[0-9]*\.[0-9]*:test/v[0-9]*\.[0-9]*"
+#    echo "Pushing branches of production versions..."
+#    git push $REMOTE_ALIAS "v[0-9]*\.[0-9]*:"
+#    echo "Pushing tags of released versions..."
+#    git push $REMOTE_ALIAS --tags
+#  fi
 }
 
 
