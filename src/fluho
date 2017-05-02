@@ -1,6 +1,6 @@
 #!/bin/bash
 
-VERSION="1.0.0-alpha"
+VERSION="1.0-alpha"
 
 USE_REMOTE=true 
 USE_REMOTEFETCH=true  # Perform checking over remote using fetched local refs 
