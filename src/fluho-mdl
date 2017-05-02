@@ -241,31 +241,31 @@ get_versions ()
     general ) 
       [[ "$vrev" == "[0-9]*" && "$vstatus" == "" ]] && \
       # Discard branches not from fluho
-      vcs_get_branches "dev/v${vmajor}\.${vminor}" | sed 's%dev/%%g' \
-        | sort --version-sort
+      local versions="`vcs_get_branches "dev/v${vmajor}\.${vminor}" \
+      | sed 's%dev/%%g'`"
       # Discard tags not from fluho
       local vstatus=${5:-(alpha|beta|rc|stable)}
-      if [ "$vstatus" == "*" ]; then vstatus="(alpha|beta|rc|stable)"; fi
-      vcs_get_tags \
-        | grep -E "^v${vmajor}\.${vminor}\.${vrev}-${vstatus}$" \
-        | sort --version-sort
+      #[ "$vstatus" == "*" ] && vstatus="(alpha|beta|rc|stable)"
+      versions="${versions}\n`vcs_get_tags \
+      | grep -E "^v${vmajor}\.${vminor}\.${vrev}-${vstatus}$"`"
+      echo -e "$versions" | sort --version-sort
       ;;
     development ) 
       [[ "$vrev" == "[0-9]*" && "$vstatus" == "" ]] && \
       # Discard branches not from fluho
       vcs_get_branches "dev/v${vmajor}\.${vminor}" | sed 's%dev/%%g' \
-        | sort --version-sort
+      | sort --version-sort
       ;;
     testing ) 
       local vstatus=${5:-[abr]*[ac]}
       [ "$vstatus" == "*" ] && vstatus="[abr]*[ac]"
       vcs_get_tags "v${vmajor}\.${vminor}\.${vrev}-${vstatus}" \
-        | sort --version-sort
+      | sort --version-sort
       ;;
     production ) 
       [[ "$vstatus" == "" || "$vstatus" == "stable" ]] && \
       vcs_get_tags "v${vmajor}\.${vminor}\.${vrev}-stable" \
-        | sort --version-sort
+      | sort --version-sort
       ;;
     * )
       echo "
