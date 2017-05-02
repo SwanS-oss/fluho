@@ -27,7 +27,18 @@ error: Only major.minor version can be initialized. Use:
       show_notinitialized_error
       exit 1  
     fi
+
+    echo -n "\
+Are you sure you want to init the version \
+${vmajor}.${vminor} [yes/No]? "; read option
+    if ! isYes "${option}"; then 
+      echo "\
+Canceled!"
+      exit 2
+    fi
+      
     init_vmajor "$vmajor" "$vminor" && success=true 
+
     if [ "$success" == true ]; then 
       echo "\
 Created branches"
@@ -58,6 +69,15 @@ error: Cannot be successfully initialized because a failure creating tags" >&2
 v${vmajor}.${vminor} initialized"
 
   elif ! exist_vminor "$vmajor" "$vminor" development; then
+    echo -n "\
+Are you sure you want to init the version \
+${vmajor}.${vminor} [yes/No]? "; read option
+    if ! isYes "${option}"; then 
+      echo "\
+Canceled!"
+      exit 2
+    fi
+      
     init_vminor "$vmajor" "$vminor" && success=true
     
     if [ "$success" == true ]; then 
