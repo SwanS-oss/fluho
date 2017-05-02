@@ -83,15 +83,13 @@ Actions:
       --init 
         Create the version (major, minor) or feature if does not exist
       --purpose {development|testing|production}
-        Select the purpose is the version for. 
-        This allow to obtain a suggestion of the latest version (major, minor 
+        Specify the purpose of the version you want to check-out. 
+        This allows to obtain a suggestion of the latest version (major, minor 
         or revision) suitable for a purpose. Default: development
   release {version_number} [options]
     Merge the current dev branch to the test branch(s) for alpha, beta and rc 
     state, or the test branch to the production branch for stable state, 
     create tags for the version and execute the extra actions for releasing. 
-    New revision number is automatically generated for the current 
-    major.minor version (revision numbers cannot be skipped).
     {version_number}
       Format: [v]{major}.{minor}.{revision}-{status}
     [options]
