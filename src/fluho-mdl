@@ -285,12 +285,29 @@ get_currentbranch ()
 }
 
 
-get_currenttag ()
+get_currenttags ()
 {
   # Discard tags not from fluho
   vcs_get_currenttags | \
-  grep -E "^v[0-9]*\.[0-9]*\.[0-9]*-(alpha|beta|rc|stable)$" | \
-  sort --version-sort | tail -n 1
+  grep -E "^v[0-9]*\.[0-9]*\.[0-9]*-(alpha|beta|rc|stable)$"
+}
+
+
+get_currenttag ()
+{
+  # Discard tags not from fluho
+  get_currenttags | sort --version-sort | tail -n 1
+}
+
+
+get_currenttags_forvmajorminor ()
+{
+  local vmajor=$1
+  local vminor=$2
+  
+  # Discard tags not from fluho
+  vcs_get_currenttags | \
+  grep -E "^v${vmajor}\.${vminor}\.[0-9]*-(alpha|beta|rc|stable)$"
 }
 
 
@@ -300,9 +317,8 @@ get_currenttag_forvmajorminor ()
   local vminor=$2
   
   # Discard tags not from fluho
-  vcs_get_currenttags | \
-  grep -E "^v${vmajor}\.${vminor}\.[0-9]*-(alpha|beta|rc|stable)$" | \
-  sort --version-sort | tail -n 1
+  get_currenttags_forvmajorminor "$vmajor" "$vminor" | sort --version-sort \
+  | tail -n 1
 }
 
 
@@ -329,6 +345,30 @@ get_currentvrev ()
 get_currentvstatus ()
 {
   get_currentversion | extract_vstatus
+}
+
+
+get_currentversions ()
+{
+  local currentpurpose=`get_currentpurpose`
+  local currentbranch=`get_currentbranch`
+  local currentversion_vmajorminor=`echo $currentbranch | \
+    sed -r 's%^(dev|test)/%%'`
+  
+  if [ "$currentpurpose" == "development" ]; then
+    # Discard branches not corresponding to version and echo version number
+    echo $currentversion_vmajorminor
+  else
+    # Discard tags not from fluho and echo version number
+    if [[ "$currentbranch" =~ ^(test/v|v)[0-9]*$ ]]; then
+      local vmajor=`extract_vmajor $currentversion_vmajorminor`
+      local vminor=`extract_vminor $currentversion_vmajorminor`
+      get_currenttags_forvmajorminor "$vmajor" "$vminor"
+    else
+      get_currenttags
+    fi
+  fi
+
 }
 
 

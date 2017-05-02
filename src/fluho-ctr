@@ -90,14 +90,24 @@ do_list()
   echodbg "feature: $feature_name\n"  # TODO
   echodbg "purpose: $OPTPURPOSE\n"
   
-  vmajor=`extract_vmajor $version`
-  vminor=`extract_vminor $version`
-  vrev=`extract_vrev $version`
-  vstatus=`extract_vstatus $version`
+  local vmajor=`extract_vmajor $version`
+  local vminor=`extract_vminor $version`
+  local vrev=`extract_vrev $version`
+  local vstatus=`extract_vstatus $version`
+  
+  local currentversions="`get_currentversions`"
+  
+  get_versions "$OPTPURPOSE" "$vmajor" "$vminor" "$vrev" "$vstatus" \
+  | while IFS='' read -r one_version || [[ -n "$one_version" ]]; do
+    if [ "`echo "$currentversions" | grep "^${one_version}$"`" == "" ]; then
+      echo "  $one_version"
+    else
+      echo "* $one_version"
+    fi
+  done
   
   
-  get_versions "$OPTPURPOSE" "$vmajor" "$vminor" "$vrev" "$vstatus"
-  
+
 #  case "$OPTPURPOSE" in
 #    general )
 #      get_versions "$OPTPURPOSE" "$vmajor" "$vminor" "$vrev" "$vstatus"
