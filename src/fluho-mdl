@@ -1,0 +1,723 @@
+#!/bin/bash
+
+
+is_initialized()
+{
+  exist_version "testing" "0" "0" "0" "alpha"
+}
+
+
+
+
+exist_vmajor()
+{
+  local vmajor=$1
+  local purpose=$2
+
+  case $purpose in
+    development ) 
+      vcs_exist_branch "dev/v${vmajor}.*"
+      ;;
+    testing ) 
+      [ "`vcs_get_tags \"v${vmajor}\.[0-9]*\.[0-9]*-[abr]*[ac]\"`" != "" ] && \
+        return 0 || return 1
+      ;;
+    production ) 
+      [ "`vcs_get_tags \"v${vmajor}\.[0-9]*\.[0-9]*-stable\"`" != "" ] && \
+        return 0 || return 1
+      ;;
+    * )
+      echo "
+Error: Internal failure checking major number exists for purpose $purpose" >&2
+      exit 1
+      ;;
+  esac
+  # RETURN_VAL 0 if vmajor exists in Git repo, 1 if not
+}
+
+
+exist_vminor()
+{
+  local vmajor=$1
+  local vminor=$2
+  local purpose=$3
+
+  case $purpose in
+    development ) 
+      vcs_exist_branch "dev/v${vmajor}.${vminor}"
+      ;;
+    testing ) 
+      vcs_exist_tag "v${vmajor}\.${vminor}\.[0-9]*-[abr]*[ac]"
+      ;;
+    production ) 
+      vcs_exist_tag "v${vmajor}\.${vminor}\.[0-9]*-stable"
+      ;;
+    * )
+      echo "
+Error: Internal. Checking minor existance. major:$major,purpose:$purpose" >&2
+      exit 1
+      ;;
+  esac
+  # RETURN_VAL 0 if vminor exists in Git repo, 1 if not
+}
+
+
+exist_vrev()
+{
+  local vmajor=$1
+  local vminor=$2
+  local vrev=$3
+  local purpose=$4
+
+  case $purpose in
+    development ) 
+      vcs_exist_branch "dev/v${vmajor}.${vminor}"
+      ;;
+    testing ) 
+      vcs_exist_tag "v${vmajor}\.${vminor}\.${vrev}-[abr]*[ac]"
+      ;;
+    production ) 
+      vcs_exist_tag "v${vmajor}\.${vminor}\.${vrev}-stable"
+      ;;
+    * )
+      echo "
+Error: Internal. Checking revision existance. \
+${major}.${minor},purpose:$purpose" >&2
+      exit 1
+      ;;
+  esac
+  # RETURN_VAL 0 if vminor exists in Git repo, 1 if not
+}
+
+
+exist_version()
+{
+  local purpose=$1
+  local vmajor=$2
+  local vminor=$3
+  local vrev=$4
+  local vstatus=$5
+
+  case $purpose in
+    development ) 
+      vcs_exist_branch "dev/v${vmajor}.${vminor}"
+      ;;
+
+    testing ) 
+      if [ "$vstatus" == "alpha" ] || [ "$vstatus" == "beta" ] || \
+        [ "$vstatus" == "rc" ]; then
+        vcs_exist_tag "v${vmajor}.${vminor}.${vrev}-${vstatus}"
+      else
+        return 1
+      fi
+      ;;
+
+    production ) 
+      if [ "$vstatus" == "stable" ]; then
+        vcs_exist_tag "v${vmajor}.${vminor}.${vrev}-${vstatus}"
+      else
+        return 1
+      fi
+      ;;
+
+    * )
+      echo "
+Error: Internal. Checking revision existance. \
+${major}.${minor},purpose:$purpose" >&2
+      exit 1
+      ;;
+  esac
+  # RETURN_VAL 0 if vminor exists in Git repo, 1 if not
+}
+
+
+
+
+init_vmajor () # (int major, int minor)
+{
+  local vmajor=$1
+  local vminor=$2
+  
+  success=false
+  
+  # La rama cuttingedge debe existir localmente
+  if ! vcs_exist_localbranch "$CUTTINGEDGE_BRANCH"; then
+    # Store current branch/commit, so we can go back to it later
+    userCheckout="`vcs_get_currentcheckout`"
+    vcs_checkout "$CUTTINGEDGE_BRANCH" && \
+    vcs_checkout "$userCheckout" && success=true
+  else
+    success=true
+  fi
+  
+  if [ "$success" == true ]; then
+    success=false
+    # Se crea la rama v{vmajor} a partir de la rama cutting-edge (master)
+    vcs_create_branch "v${vmajor}" "$CUTTINGEDGE_BRANCH" && \
+    # Se crea la rama test/v{vmajor} a partir de la rama v{vmajor}
+    vcs_create_branch "test/v${vmajor}" "v${vmajor}" && \
+    # Se crea la rama v{vmajor}.{vminor} a partir de la rama v{vmajor}
+    vcs_create_branch "v${vmajor}.${vminor}" "v${vmajor}" && \
+    # Se crea la rama test/v{vmajor}.{vminor} a partir de la rama v{vmajor}.{vminor}
+    vcs_create_branch "test/v${vmajor}.${vminor}" "v${vmajor}.${vminor}" && \
+    # Se crea la rama dev/v{vmajor}.{vminor} a partir de la rama test/v{vmajor}.{vminor}
+    vcs_create_branch "dev/v${vmajor}.${vminor}" "test/v${vmajor}.${vminor}" &&\
+    success=true
+  fi
+  
+  [ "$success" == true ] && return 0 || return 1
+}
+
+
+init_vminor () # (int major, int minor)
+{
+  local vmajor=$1
+  local vminor=$2
+  
+  success=false
+  
+  if ! vcs_exist_localbranch "v${vmajor}"; then
+    # Store current branch/commit, so we can go back to it later
+    userCheckout="`vcs_get_currentcheckout`"
+    vcs_checkout "v${vmajor}"
+    vcs_checkout "$userCheckout"
+  fi
+  
+  # Se crea la rama v{vmajor}.{vminor} a partir de la rama v{vmajor}
+  vcs_create_branch "v${vmajor}.${vminor}" "v${vmajor}" && \
+  # Se crea la rama test/v{vmajor}.{vminor} a partir de la rama v{vmajor}.{vminor}
+  vcs_create_branch "test/v${vmajor}.${vminor}" "v${vmajor}.${vminor}" && \
+  # Se crea la rama dev/v{vmajor}.{vminor} a partir de la rama test/v{vmajor}.{vminor}
+  vcs_create_branch "dev/v${vmajor}.${vminor}" "test/v${vmajor}.${vminor}" && \
+  success=true
+  
+  [ "$success" == true ] && return 0 || return 1
+}
+
+
+init_feature ()
+{
+  # TODO
+  local major=$1
+  local minor=$2
+  local feature=$3
+  
+  # Se crea la rama dev/v{major}.{minor}/{feature} a partir de la rama dev/v{major}.{minor}  ◄◄◄
+  echo 
+}
+
+
+end_feature ()
+{
+  # TODO
+  local major=$1
+  local minor=$2
+  local feature=$3
+
+  # Se fusiona la rama dev/v{major}.{minor}/{feature} con rama dev/v{major}.{minor} sin fast-forward  ◄◄◄
+  # Se elimina la rama dev/v{major}.{minor}/{feature}  ◄◄◄
+  echo 
+}
+
+
+
+
+get_versions ()
+{
+  
+  local purpose=${1:-general}
+  local vmajor=${2:-[0-9]*}
+  local vminor=${3:-[0-9]*}
+  local vrev=${4:-[0-9]*}
+  
+  ## Protection when users uses * as wildcard to list any version component (v1.1.*-alpha)
+  ## NOTE: User should leave empty the field instead of using *, to avoid
+  ## bash expansion of * to all files in dir. (v1.1.-alpha)
+  #[ "$vmajor" == "*" ] && vmajor="[0-9]*"
+  #[ "$vminor" == "*" ] && vminor="[0-9]*"
+  #[ "$vrev" == "*" ] && vrev="[0-9]*"
+  
+  case $purpose in
+    general ) 
+      [[ "$vrev" == "[0-9]*" && "$vstatus" == "" ]] && \
+      # Discard branches not from fluho
+      vcs_get_branches "dev/v${vmajor}\.${vminor}" | sed 's%dev/%%g' \
+        | sort --version-sort
+      # Discard tags not from fluho
+      local vstatus=${5:-(alpha|beta|rc|stable)}
+      if [ "$vstatus" == "*" ]; then vstatus="(alpha|beta|rc|stable)"; fi
+      vcs_get_tags \
+        | grep -E "^v${vmajor}\.${vminor}\.${vrev}-${vstatus}$" \
+        | sort --version-sort
+      ;;
+    development ) 
+      [[ "$vrev" == "[0-9]*" && "$vstatus" == "" ]] && \
+      # Discard branches not from fluho
+      vcs_get_branches "dev/v${vmajor}\.${vminor}" | sed 's%dev/%%g' \
+        | sort --version-sort
+      ;;
+    testing ) 
+      local vstatus=${5:-[abr]*[ac]}
+      [ "$vstatus" == "*" ] && vstatus="[abr]*[ac]"
+      vcs_get_tags "v${vmajor}\.${vminor}\.${vrev}-${vstatus}" \
+        | sort --version-sort
+      ;;
+    production ) 
+      [[ "$vstatus" == "" || "$vstatus" == "stable" ]] && \
+      vcs_get_tags "v${vmajor}\.${vminor}\.${vrev}-stable" \
+        | sort --version-sort
+      ;;
+    * )
+      echo "
+error: internal. get_versions() for $purpose" >&2
+      exit 1
+      ;;
+  esac
+}
+
+
+
+
+get_currentbranch ()
+{
+  # Discard branches not from fluho
+  vcs_get_currentbranch | grep -E "^(dev/v|test/v|v)[0-9]*"
+}
+
+
+get_currenttag ()
+{
+  # Discard tags not from fluho
+  vcs_get_currenttags | \
+  grep -E "^v[0-9]*\.[0-9]*\.[0-9]*-(alpha|beta|rc|stable)$" | \
+  sort --version-sort | tail -n 1
+}
+
+
+get_currenttag_forvmajorminor ()
+{
+  local vmajor=$1
+  local vminor=$2
+  
+  # Discard tags not from fluho
+  vcs_get_currenttags | \
+  grep -E "^v${vmajor}\.${vminor}\.[0-9]*-(alpha|beta|rc|stable)$" | \
+  sort --version-sort | tail -n 1
+}
+
+
+
+
+get_currentvmajor ()
+{
+  get_currentversion | extract_vmajor
+}
+
+
+get_currentvminor ()
+{
+  get_currentversion | extract_vminor
+}
+
+
+get_currentvrev ()
+{
+  get_currentversion | extract_vrev
+}
+
+
+get_currentvstatus ()
+{
+  get_currentversion | extract_vstatus
+}
+
+
+get_currentversion ()
+{
+  local currentpurpose=`get_currentpurpose`
+  local currentbranch=`get_currentbranch`
+  local currentversion_vmajorminor=`echo $currentbranch | \
+    sed -r 's%^(dev|test)/%%'`
+  
+  if [ "$currentpurpose" == "development" ]; then
+    # Discard branches not corresponding to version and echo version number
+    echo $currentversion_vmajorminor
+  else
+    # Discard tags not from fluho and echo version number
+    if [[ "$currentbranch" =~ ^(test/v|v)[0-9]*$ ]]; then
+      local vmajor=`extract_vmajor $currentversion_vmajorminor`
+      local vminor=`extract_vminor $currentversion_vmajorminor`
+      get_currenttag_forvmajorminor "$vmajor" "$vminor"
+    else
+      get_currenttag
+    fi
+  fi
+
+}
+
+
+get_currentpurpose ()
+{
+  # Discard branches not corresponding to version and extract version number
+  local currentbranch=`get_currentbranch`
+  local currenttag=`get_currenttag`
+  
+  if [ "$currentbranch" != "" ]; then
+    case "`echo $currentbranch | sed -rn 's%^(dev/v|test/v|v)[0-9].*$%\1%p'`" in
+      "dev/v" ) 
+        echo development
+        ;;
+      "test/v" ) 
+        echo testing
+        ;;
+      "v" )
+        echo production
+        ;;
+      * )
+        echo "\
+error: internal. get_currentpurpose() with currentbranch: $currentbranch" >&2
+        ;;
+    esac
+  elif [ "$currenttag" != "" ]; then
+    # Discard tags not from fluho and extract version number
+    case "`extract_vstatus $currenttag`" in
+        alpha|beta|rc )
+          echo testing
+          ;;
+        stable )
+          echo production
+          ;;
+        * )
+        echo "\
+error: internal. get_currentpurpose() with currenttag: $currentbranch" >&2 
+          ;;
+      esac
+  fi
+    
+}
+
+
+
+
+get_latestvmajor ()
+{
+  local purpose=${1:-development}
+  
+  case $purpose in
+    development ) 
+      vcs_get_branches "dev/v[0-9]*\.[0-9]*" | sed 's%^dev/v%%g' | \
+        sort --version-sort | tail -n 1 | extract_vmajor #awk 'BEGIN { FS = "." } ; {print $1}'
+      ;;
+    testing ) 
+      vcs_get_tags "v[0-9]*\.[0-9]*\.[0-9]*-[abr]*[ac]" | \
+        sort --version-sort | tail -n 1 | extract_vmajor
+      ;;
+    production ) 
+      vcs_get_tags "v[0-9]*\.[0-9]*\.[0-9]*-stable" | \
+        sort --version-sort | tail -n 1 | extract_vmajor
+      ;;
+    * )
+      echo "
+error: internal. get_latestvmajor() for purpose: $purpose" >&2
+      exit 1
+      ;;
+  esac
+  
+}
+
+
+get_latestvminor ()
+{
+  local vmajor=$1
+  local purpose=${2:-development}
+  
+  case $purpose in
+    development ) 
+      vcs_get_branches "dev/v${vmajor}\.[0-9]*" | sed 's%^dev/v%%g' | \
+        sort --version-sort | tail -n 1 | extract_vminor
+      ;;
+    testing ) 
+      vcs_get_tags "v${vmajor}\.[0-9]*\.[0-9]*-[abr]*[ac]" | \
+        sort --version-sort | tail -n 1 | extract_vminor
+      ;;
+    production ) 
+      vcs_get_tags "v${vmajor}\.[0-9]*\.[0-9]*-stable" | \
+        sort --version-sort | tail -n 1 | extract_vminor
+      ;;
+    * )
+      echo "
+error: internal. get_latestvminor() for $purpose" >&2
+      exit 1
+      ;;
+  esac
+
+  
+}
+
+
+get_latestvrev ()
+{
+  local vmajor=$1
+  local vminor=$2
+  local purpose=${3:-general}
+
+  case $purpose in
+    general ) 
+      vcs_get_tags "v${vmajor}\.${vminor}\.[0-9]*-[abrs]*[ace]" \
+        | sort --version-sort | tail -n 1 | extract_vrev
+      ;;
+    testing ) 
+      vcs_get_tags "v${vmajor}\.${vminor}\.[0-9]*-[abr]*[ac]" \
+        | sort --version-sort | tail -n 1 | extract_vrev
+      ;;
+    production ) 
+      vcs_get_tags "v${vmajor}\.${vminor}\.[0-9]*-stable" \
+        | sort --version-sort | tail -n 1 | extract_vrev
+      ;;
+    * )
+      echo "
+error: internal. get_latestvrev() for $purpose" >&2
+      exit 1
+      ;;
+  esac
+  
+}
+
+
+get_latestvstatus ()
+{
+  local vmajor=$1
+  local vminor=$2
+  local purpose=${3:-general}
+  
+  local latestvrev=$(get_latestvrev "$vmajor" "$vminor" "$purpose")
+  
+  case $purpose in
+    general ) 
+      vcs_get_tags "v${vmajor}\.${vminor}\.${latestvrev}-[abrs]*[ace]" | \
+        sort | tail -n 1 | extract_vstatus
+      ;;
+    testing )
+      vcs_get_tags "v${vmajor}\.${vminor}\.${latestvrev}-[abr]*[ac]" | \
+        sort | tail -n 1 | extract_vstatus
+      ;;
+    production )
+      vcs_get_tags "v${vmajor}\.${vminor}\.${latestvrev}-stable" | \
+        sort | tail -n 1 | extract_vstatus
+      ;;
+    *)
+      echo "
+error: internal. get_latestvstatus() for $purpose" >&2
+      exit 1
+      ;;
+  esac
+
+}
+
+
+get_vstatus ()
+{
+  local vmajor=$1
+  local vminor=$2
+  local vrev=$3
+  local purpose=${4:-general}
+ 
+  case $purpose in
+    general ) 
+      vcs_get_tags "v${vmajor}\.${vminor}\.${vrev}-[abrs]*[ace]" | sort | \
+        tail -n 1 | extract_vstatus
+      ;;
+    testing )
+      vcs_get_tags "v${vmajor}\.${vminor}\.${vrev}-[abr]*[ac]" | sort | \
+        tail -n 1 | extract_vstatus
+      ;;
+    production )
+      vcs_get_tags "v${vmajor}\.${vminor}\.${vrev}-stable" | sort | \
+        tail -n 1 | extract_vstatus
+      ;;
+    *)
+      echo "
+error: internal. get_vstatus() for $purpose" >&2
+      exit 1
+      ;;
+  esac
+}
+
+
+get_latestversion ()
+{
+  local purpose=$1
+  local vmajor=$2
+  local vminor=$3
+  local vrev=$4
+  local vstatus=$5
+  
+  case $purpose in
+    development )
+      if [ "$vmajor" == "" ]; then
+        vmajor=`get_latestvmajor "$purpose"`
+        vminor=`get_latestvminor "$vmajor" "$purpose"`
+      elif [ "$vminor" == "" ]; then
+        vminor=`get_latestvminor "$vmajor" "$purpose"`
+      fi
+      if [ "$vminor" != "" ] && exist_version $purpose ${vmajor} ${vminor}; then
+        echo "${vmajor}.${vminor}"
+      fi
+      ;;
+    
+    testing | production )
+      if [ "$vmajor" == "" ]; then
+        vmajor=`get_latestvmajor "$purpose"`
+        vminor=`get_latestvminor "$vmajor" "$purpose"`
+        vrev=`get_latestvrev "$vmajor" "$vminor" "$purpose"`
+        vstatus=`get_vstatus "$vmajor" "$vminor" "$vrev" "$purpose"`
+      elif [ "$vminor" == "" ]; then
+        vminor=`get_latestvminor "$vmajor" "$purpose"`
+        vrev=`get_latestvrev "$vmajor" "$vminor" "$purpose"`
+        vstatus=`get_vstatus "$vmajor" "$vminor" "$vrev" "$purpose"`
+      elif [ "$vrev" == "" ]; then
+        vrev=`get_latestvrev "$vmajor" "$vminor" "$purpose"`
+        vstatus=`get_vstatus "$vmajor" "$vminor" "$vrev" "$purpose"`
+      elif [ "$vstatus" == "" ]; then
+        vstatus=`get_vstatus "$vmajor" "$vminor" "$vrev" "$purpose"`
+      fi
+      if [ "$vstatus" != "" ] && \
+        exist_version $purpose ${vmajor} ${vminor} ${vrev} ${vstatus}; then
+        echo "${vmajor}.${vminor}.${vrev}-${vstatus}"
+      fi
+      ;;
+    
+    * )
+      echo "
+error: internal. get_latestversion() for $purpose" >&2
+      exit 1
+      ;;
+  esac
+  
+}
+
+
+
+
+get_nextvrev ()
+{
+  local vmajor=$1
+  local vminor=$2
+  
+  local latestvrev=$(get_latestvrev "$vmajor" "$vminor" general)
+  
+  echo $(( ${latestvrev:--1} + 1 ))
+}
+
+
+get_nextvstatusrev ()
+{
+  local vmajor=$1
+  local vminor=$2
+  local vstatus=$3
+  
+  # Count previous revision released for vstatus
+  vcs_get_tags "v${vmajor}\.${vminor}\.[0-9]*-${vstatus}" | wc -l
+}
+
+
+
+
+is_pastvstatus ()
+{
+  local vmajor=$1
+  local vminor=$2
+  local vstatus=$3
+  local latestvstatus=`get_latestvstatus "$vmajor" "$vminor"`
+  
+  case $vstatus in
+    alpha )
+      if [ "$latestvstatus" == "beta" ] || [ "$latestvstatus" == "rc" ] || \
+        [ "$latestvstatus" == "stable" ]; then
+        return 0
+      else
+        return 1
+      fi
+      ;;
+    beta )
+      if [ "$latestvstatus" == "rc" ] || [ "$latestvstatus" == "stable" ]; then
+        return 0
+      else
+        return 1
+      fi
+      ;;
+    rc )
+      if [ "$latestvstatus" == "stable" ]; then
+        return 0
+      else
+        return 1
+      fi
+
+      ;;
+    stable )
+      return 1
+      ;;
+    * )
+      
+      ;;
+  esac
+}
+
+
+
+
+is_headinvmajor ()
+{
+  if [ "$1" != "" ]; then echo "$1" | $FUNCNAME; else
+    local vmajor=`cat | extract_vmajor`
+    
+    [ $vmajor -eq `get_latestvmajor development` ] && return 0 || return 1
+  fi
+}
+
+
+is_headinvminor ()
+{
+  if [ "$1" != "" ]; then echo "$1" | $FUNCNAME; else
+    local version="`cat`"
+    local vmajor=`extract_vmajor $version`
+    local vminor=`extract_vminor $version`
+    
+    [ $vminor -eq `get_latestvminor "$vmajor" development` ] && \
+      return 0 || return 1
+  fi
+}
+
+
+is_latestvrev ()
+{
+  if [ "$1" != "" ]; then echo "$1" | $FUNCNAME; else
+    local version="`cat`"
+    local vmajor=`extract_vmajor $version`
+    local vminor=`extract_vminor $version`
+    local vrev=`extract_vrev $version`
+    
+    [ $vrev -eq `get_latestvrev "$vmajor" "$vminor" general` ] && \
+      return 0 || return 1
+  fi
+}
+
+
+get_vtype ()
+{
+  if [ "$1" != "" ]; then echo "$1" | $FUNCNAME; else
+    local version="`cat`"
+    headinvmajor=`is_headinvmajor $version; echo $?`
+    headinvminor=`is_headinvminor $version; echo $?`
+    
+    if [ $headinvmajor -eq 0 ] && [ $headinvminor -eq 0 ]; then
+      echo cuttingedge
+    elif [ $headinvminor -eq 0 ]; then
+      echo maintenance1
+    else
+      echo maintenance2
+    fi
+  fi
+}
+
+
