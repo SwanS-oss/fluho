@@ -3,6 +3,11 @@
 
 do_init()
 {
+  echodbg "usa init\n"
+  echodbg "version: $version\n"
+  echodbg "feature: $OPTFEATURE\n"  # TODO
+  echodbg "feature name: $feature_name\n"  # TODO
+  
   local version=$1
   
   local vmajor=`extract_vmajor $version`
@@ -11,6 +16,11 @@ do_init()
   local vstatus=`extract_vstatus $version`
   
   local success=false
+  
+  if [ "$OPTFEATURE" == 1 ]; then
+    echo "'feature' option still as ToDo."
+    exit 1
+  fi
   
   vmajor=${vmajor:-0}
   vminor=${vminor:-0}
@@ -236,9 +246,15 @@ do_checkout()
   local version=${1:-"."}
 
   echodbg "version: $version\n"
-  echodbg "feature: $feature_name\n"  # TODO
+  echodbg "feature: $OPTFEATURE\n"
+  echodbg "feature name: $feature_name\n"  # TODO
   echodbg "init: $OPTINIT\n"
   echodbg "purpose: $OPTPURPOSE\n"
+  
+  if [ "$OPTFEATURE" == 1 ]; then
+    echo "'feature' option still as ToDo."
+    exit 1
+  fi
   
   vmajor=`extract_vmajor $version`
   vminor=`extract_vminor $version`
@@ -378,12 +394,18 @@ do_release()
   local version=${1:-"."}
 
   echodbg "usa release\n"
-  echodbg "feature: $feature_name\n"  # TODO
+  echodbg "feature: $OPTFEATURE\n"  # TODO
+  echodbg "feature name: $feature_name\n"  # TODO
 
   local vmajor=`extract_vmajor $version`
   local vminor=`extract_vminor $version`
   local vrev=`extract_vrev $version`
   local vstatus=`extract_vstatus $version`
+  
+  if [ "$OPTFEATURE" == 1 ]; then
+    echo "'feature' option still as ToDo."
+    exit 1
+  fi
   
   if [ "$vmajor" == "" ] || [ "$vminor" == "" ] || [ "$vrev" == "" ] || \
     [ "$vstatus" == "" ]; then
