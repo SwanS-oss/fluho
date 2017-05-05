@@ -354,8 +354,8 @@ error: Given data did not match any released version for production." >&2
           exit 1
         else
           echo "\
-Checking out to the version: v${latestversion}"
-          vcs_checkout "v${latestversion}"
+Checking out to the version: ${latestversion}"
+          vcs_checkout "${latestversion}"
         fi
         
       else

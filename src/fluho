@@ -182,7 +182,7 @@ show_checkoutversion_suggestion()
     echo "\
 To checkout to the${latesttxt} version for ${purpose}${matchingtxt}, use:
 
-    $ ${0##*/} checkout v${latestversion}"
+    $ ${0##*/} checkout ${latestversion}"
 
   else
   
