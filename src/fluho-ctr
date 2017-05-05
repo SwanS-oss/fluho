@@ -17,7 +17,7 @@ do_init()
   
   local success=false
   
-  if [ "$OPTFEATURE" == 1 ]; then
+  if [ "$OPTFEATURE" == true ]; then
     echo "'feature' option still as ToDo."
     exit 1
   fi
@@ -259,7 +259,7 @@ do_checkout()
   echodbg "init: $OPTINIT\n"
   echodbg "purpose: $OPTPURPOSE\n"
   
-  if [ "$OPTFEATURE" == 1 ]; then
+  if [ "$OPTFEATURE" == true ]; then
     echo "'feature' option still as ToDo."
     exit 1
   fi
@@ -269,7 +269,7 @@ do_checkout()
   vrev=`extract_vrev $version`
   vstatus=`extract_vstatus $version`
       
-  case $OPTPURPOSE in
+  case "$OPTPURPOSE" in
     development )
       if [ "$vmajor" == "" ] || [ "$vminor" == "" ]; then
         
@@ -410,7 +410,7 @@ do_release()
   local vrev=`extract_vrev $version`
   local vstatus=`extract_vstatus $version`
   
-  if [ "$OPTFEATURE" == 1 ]; then
+  if [ "$OPTFEATURE" == true ]; then
     echo "'feature' option still as ToDo."
     exit 1
   fi
