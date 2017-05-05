@@ -60,10 +60,12 @@ Actions:
     [options]
       --feature {feature_name}
         Create branches for the development of a specific feature of the version
-  list [options]
-    Show all the available versions.
+  list [version_number] [options]
+    Show all the available versions that matches the given 'version_number'.
     [options]
       --format (base|alternative). Default: base
+      --latest
+        Show only the latest version that matches the given 'version_number'.
       --purpose {development|testing|production}
         Limit the list to versions for development, testing or production. 
   status
@@ -117,7 +119,7 @@ show_option_error()
   echo "\
 error: Bad argument. Take a look at:
 
-      $ ${0##*/} --help" >&2
+    $ ${0##*/} --help" >&2
 }
 
 
@@ -126,7 +128,7 @@ show_notinitialized_error()
   echo "\
 error: Not under fluho version control. Use:
 
-      $ ${0##*/} init" >&2
+    $ ${0##*/} init" >&2
 }
 
 
@@ -180,7 +182,7 @@ show_checkoutversion_suggestion()
     echo "\
 To checkout to the${latesttxt} version for ${purpose}${matchingtxt}, use:
 
-      $ ${0##*/} checkout v${latestversion}"
+    $ ${0##*/} checkout v${latestversion}"
 
   else
   
@@ -315,9 +317,10 @@ main()
 {
   # Grab options
 
-  OPTINIT=false
   OPTFEATURE=false
-  OPTFORMAT=base  # base=base  alternative=alt
+  OPTFORMAT="base"  # base=base  alternative=alt
+  OPTINIT=false
+  OPTLATEST=false
   OPTPURPOSE=""  # development, testing, production
   
   if [ $# -eq 0 ]; then
@@ -332,7 +335,7 @@ error: Not under a version control system" >&2
   fi
   
   args=`getopt -o : --long \
-  init,feature:,format:,noremote,purpose:,remote:,version,help -- "$@"`
+  feature:,format:,init,latest,noremote,purpose:,remote:,version,help -- "$@"`
   if [ $? -ne 0 ]; then
     show_option_error
     exit 1
@@ -342,19 +345,21 @@ error: Not under a version control system" >&2
 
   while true ; do
     case "$1" in
-      --init )          OPTINIT=true
-                        ;;
       --feature )       shift
-                        OPTFEATURE=1
+                        OPTFEATURE=true
                         feature_name=$1
                         ;;
       --format )        shift
                         case "$1" in
-                          base )        OPTFORMAT=base
+                          base )        OPTFORMAT="base"
                                         ;;
-                          alternative ) OPTFORMAT=alt
+                          alternative ) OPTFORMAT="alt"
                                         ;;
                         esac
+                        ;;
+      --init )          OPTINIT=true
+                        ;;
+      --latest )        OPTLATEST=true
                         ;;
       --noremote )      USE_REMOTE=false
                         ;;
@@ -363,7 +368,7 @@ error: Not under a version control system" >&2
                         REMOTE_ALIAS=$1
                         ;;
       --purpose )       shift
-                        OPTPURPOSE=`complete_purposename $1`
+                        OPTPURPOSE="`complete_purposename $1`"
                         ;;
       --version )       echo "fluho version $VERSION"; exit 0
                         ;;
@@ -400,7 +405,7 @@ To avoid this message, use --noremote argument or set USE_REMOTE config to false
                         show_versionformat_error $version
                         exit 1
                       fi
-                      OPTPURPOSE=${OPTPURPOSE:-general}
+                      OPTPURPOSE="${OPTPURPOSE:-general}"
                       do_list $version
                       ;;
       status | st )   do_status
@@ -411,12 +416,12 @@ To avoid this message, use --noremote argument or set USE_REMOTE config to false
                         show_versionformat_error $version
                         exit 1
                       fi
-                      OPTPURPOSE=${OPTPURPOSE:-`extract_vpurpose $version`}
-                      if [ $OPTINIT == true ]; then
+                      OPTPURPOSE="${OPTPURPOSE:-`extract_vpurpose $version`}"
+                      if [ "$OPTINIT" == true ]; then
                         local vmajor=`extract_vmajor $version`
                         local vminor=`extract_vminor $version`
                         version="${vmajor:-0}.${vminor:-0}"
-                        OPTPURPOSE=${OPTPURPOSE:-development}
+                        OPTPURPOSE="${OPTPURPOSE:-development}"
                         if [ "$OPTPURPOSE" == "development" ]; then
                           do_init $version
                           do_checkout $version

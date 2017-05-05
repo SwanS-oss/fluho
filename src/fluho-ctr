@@ -29,7 +29,7 @@ do_init()
     echo "\
 error: Only major.minor version can be initialized. Use:
 
-      $ ${0##*/} init ${vmajor}.${vminor}" >&2
+    $ ${0##*/} init ${vmajor}.${vminor}" >&2
     exit 1
   fi
   if ! exist_vmajor "$vmajor" development; then
@@ -120,6 +120,7 @@ do_list()
   echodbg "format: $OPTFORMAT\n"
   echodbg "feature: $feature_name\n"  # TODO
   echodbg "purpose: $OPTPURPOSE\n"
+  echodbg "latest: $OPTLATEST\n"
   
   local vmajor=`extract_vmajor $version`
   local vminor=`extract_vminor $version`
@@ -128,7 +129,14 @@ do_list()
   
   local currentversions="`get_currentversions`"
   
-  get_versions "$OPTPURPOSE" "$vmajor" "$vminor" "$vrev" "$vstatus" \
+  if [ "$OPTLATEST" != true ]; then
+    local versions="`get_versions "$OPTPURPOSE" "$vmajor" "$vminor" "$vrev" "$vstatus"`"
+  else
+    [ "$OPTPURPOSE" == "general" ] && OPTPURPOSE="development"
+    local versions="`get_latestversion "$OPTPURPOSE" "$vmajor" "$vminor" "$vrev" "$vstatus"`"
+  fi 
+  
+  [ "$versions" != "" ] && echo "$versions" \
   | while IFS='' read -r one_version || [[ -n "$one_version" ]]; do
     if [ "`echo "$currentversions" | grep "^${one_version}$"`" == "" ]; then
       echo "  $one_version"
@@ -267,7 +275,7 @@ do_checkout()
         
         # There was empty needed field
         echo "\
-error: Cersion not completely specified as {major}.{minor}" >&2
+error: Version not completely specified as {major}.{minor}" >&2
         show_checkoutversion_suggestion development "$vmajor" "$vminor"
         exit 1
         
@@ -288,7 +296,7 @@ $ ${0##*/} checkout v{major}.{minor}.{rev}-stable" >&2
 error: v${vmajor}.${vminor} did not match any existing version for development.
 To checkout and initialize it as a new version, use:
 
-      $ ${0##*/} checkout v${vmajor}.${vminor} --init" >&2
+    $ ${0##*/} checkout v${vmajor}.${vminor} --init" >&2
           exit 1
         else
           echo "\
@@ -417,7 +425,7 @@ do_release()
     echo "\
 error: Specify version to release. For example:
 
-      $ ${0##*/} release v${vmajor}.${vminor}.${nextvrev}-$latestvstatus" >&2
+    $ ${0##*/} release v${vmajor}.${vminor}.${nextvrev}-$latestvstatus" >&2
     exit 1
   fi
       
@@ -444,7 +452,7 @@ error: v${vmajor}.${vminor}.${vrev}-${vstatus} already exists" >&2
         echo "\
 error: Given revision number (${vrev}) must be consecutive to the latest one. Use:
 
-      $ ${0##*/} release v${vmajor}.${vminor}.${nextvrev}-${vstatus}" >&2
+    $ ${0##*/} release v${vmajor}.${vminor}.${nextvrev}-${vstatus}" >&2
         exit 1
       fi 
       # Comprobacion de no retroceso en el estado cuando no admitido
