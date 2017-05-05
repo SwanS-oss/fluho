@@ -271,6 +271,8 @@ error: internal. get_versions() for $purpose" >&2
       exit 1
       ;;
   esac
+  
+  # Returns versions list. Every version begins with v.
 }
 
 
@@ -366,7 +368,8 @@ get_currentversions ()
       get_currenttags
     fi
   fi
-
+  
+  # Returns versions list. Every version begins with v.
 }
 
 
@@ -390,7 +393,8 @@ get_currentversion ()
       get_currenttag
     fi
   fi
-
+  
+  # Returns version. Begins with v.
 }
 
 
@@ -599,7 +603,7 @@ get_latestversion ()
         vminor=`get_latestvminor "$vmajor" "$purpose"`
       fi
       if [ "$vminor" != "" ] && exist_version $purpose ${vmajor} ${vminor}; then
-        echo "${vmajor}.${vminor}"
+        echo "v${vmajor}.${vminor}"
       fi
       ;;
     
@@ -621,7 +625,7 @@ get_latestversion ()
       fi
       if [ "$vstatus" != "" ] && \
         exist_version $purpose ${vmajor} ${vminor} ${vrev} ${vstatus}; then
-        echo "${vmajor}.${vminor}.${vrev}-${vstatus}"
+        echo "v${vmajor}.${vminor}.${vrev}-${vstatus}"
       fi
       ;;
     
@@ -632,6 +636,7 @@ error: internal. get_latestversion() for $purpose" >&2
       ;;
   esac
   
+  # Returns version. Begins with v.
 }
 
 
