@@ -398,10 +398,14 @@ do_release()
   echodbg "feature: $OPTFEATURE\n"  # TODO
   echodbg "feature name: $feature_name\n"  # TODO
 
-  local vmajor=`extract_vmajor $version`
-  local vminor=`extract_vminor $version`
-  local vrev=`extract_vrev $version`
-  local vstatus=`extract_vstatus $version`
+  local vmajor="`extract_vmajor $version`"
+  local vminor="`extract_vminor $version`"
+  local vrev="`extract_vrev $version`"
+  local vstatus="`extract_vstatus $version`"
+
+  local nextvrev
+  local currentpurpose
+  local latestvstatus
   
   if [ "$OPTFEATURE" == true ]; then
     echo "'feature' option still as ToDo."
@@ -411,17 +415,18 @@ do_release()
   if [ "$vmajor" == "" ] || [ "$vminor" == "" ] || [ "$vrev" == "" ] || \
     [ "$vstatus" == "" ]; then
     # Show error and suggestion
-    local vmajor=$(get_currentvmajor); vmajor=${vmajor:-0}
-    local vminor=$(get_currentvminor); vminor=${vminor:-0}
-    local nextvrev=$(get_nextvrev "$vmajor" "$vminor")
-    local currentpurpose=$(get_currentpurpose)
-    local currentpurpose=${currentpurpose:-general}
+    vmajor=$(get_currentvmajor); vmajor=${vmajor:-0}
+    vminor=$(get_currentvminor); vminor=${vminor:-0}
+    currentpurpose=$(get_currentpurpose)
+    currentpurpose=${currentpurpose:-general}
     case "$currentpurpose" in
       development ) 
-        local latestvstatus=$(get_latestvstatus "$vmajor" "$vminor" "testing")
+        latestvstatus=$(get_latestvstatus "$vmajor" "$vminor" "testing")
+        nextvrev=$(get_nextvrev "$vmajor" "$vminor")
         ;;
       * )
-        local latestvstatus=$(get_latestvstatus "$vmajor" "$vminor" "general")
+        latestvstatus=$(get_latestvstatus "$vmajor" "$vminor" "general")
+        nextvrev=$(get_currentvrev); nextvrev=${nextvrev:-0}
     esac
     latestvstatus=${latestvstatus:-alpha}
     echo "\
@@ -462,7 +467,7 @@ error: Given revision number (${vrev}) must be consecutive to the latest one. Us
         is_pastvstatus "$vmajor" "$vminor" "$vstatus"; then
         echo "\
 error: Cannot back to a past status (except to rc). Use at least \
-'`get_latestvstatus "$vmajor" "$vminor"`'" >&2
+'`get_latestvstatus "$vmajor" "$vminor" "testing"`'" >&2
         exit 1
       fi
       
