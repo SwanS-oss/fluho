@@ -244,8 +244,13 @@ get_versions ()
       # Discard tags not from fluho
       local vstatus=${5:-(alpha|beta|rc|stable)}
       #[ "$vstatus" == "*" ] && vstatus="(alpha|beta|rc|stable)"
-      versions="${versions}\n`vcs_get_tags \
-      | grep -E "^v${vmajor}\.${vminor}\.${vrev}-${vstatus}$"`"
+      if [ "$versions" != "" ]; then
+        versions="${versions}\n`vcs_get_tags \
+        | grep -E "^v${vmajor}\.${vminor}\.${vrev}-${vstatus}$"`"
+      else
+        versions="`vcs_get_tags \
+        | grep -E "^v${vmajor}\.${vminor}\.${vrev}-${vstatus}$"`"
+      fi
       echo -e "$versions" | sort --version-sort
       ;;
     development ) 
