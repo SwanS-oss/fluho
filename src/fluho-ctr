@@ -423,10 +423,19 @@ do_release()
   
   if [ "$vmajor" == "" ] || [ "$vminor" == "" ] || [ "$vrev" == "" ] || \
     [ "$vstatus" == "" ]; then
-    vmajor=$(get_currentvmajor); vmajor=${vmajor:-0}
-    vminor=$(get_currentvminor); vminor=${vminor:-0}
-    nextvrev=$(get_nextvrev "$vmajor" "$vminor")
-    latestvstatus=$(get_latestvstatus "$vmajor" "$vminor" general)
+    # Show error and suggestion
+    local vmajor=$(get_currentvmajor); vmajor=${vmajor:-0}
+    local vminor=$(get_currentvminor); vminor=${vminor:-0}
+    local nextvrev=$(get_nextvrev "$vmajor" "$vminor")
+    local currentpurpose=$(get_currentpurpose)
+    local currentpurpose=${currentpurpose:-general}
+    case "$currentpurpose" in
+      development ) 
+        local latestvstatus=$(get_latestvstatus "$vmajor" "$vminor" "testing")
+        ;;
+      * )
+        local latestvstatus=$(get_latestvstatus "$vmajor" "$vminor" "general")
+    esac
     latestvstatus=${latestvstatus:-alpha}
     echo "\
 error: Specify version to release. For example:
