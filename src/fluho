@@ -389,6 +389,11 @@ To avoid this message, use --noremote argument or set USE_REMOTE config to false
     USE_REMOTE=false
   fi
 
+  if [ $# -eq 0 ]; then
+    show_help
+    exit 1
+  fi
+
   while [ $# -ge 1 ]; do
     case "$1" in
       init )          shift
