@@ -540,20 +540,20 @@ get_latestvstatus ()
   local vminor=$2
   local purpose=${3:-general}
   
-  local latestvrev=$(get_latestvrev "$vmajor" "$vminor" "$purpose")
+  #local latestvrev=$(get_latestvrev "$vmajor" "$vminor" "$purpose")
   
   case $purpose in
     general ) 
-      vcs_get_tags "v${vmajor}\.${vminor}\.${latestvrev}-[abrs]*[ace]" | \
-        sort | tail -n 1 | extract_vstatus
+      vcs_get_tags "v${vmajor}\.${vminor}\.[0-9]*-[abrs]*[ace]" \
+      | extract_vstatus | sort | tail -n 1
       ;;
     testing )
-      vcs_get_tags "v${vmajor}\.${vminor}\.${latestvrev}-[abr]*[ac]" | \
-        sort | tail -n 1 | extract_vstatus
+      vcs_get_tags "v${vmajor}\.${vminor}\.[0-9]*-[abr]*[ac]" \
+      | extract_vstatus | sort | tail -n 1
       ;;
     production )
-      vcs_get_tags "v${vmajor}\.${vminor}\.${latestvrev}-stable" | \
-        sort | tail -n 1 | extract_vstatus
+      vcs_get_tags "v${vmajor}\.${vminor}\.[0-9]*-stable" \
+      | extract_vstatus | sort | tail -n 1
       ;;
     *)
       echo "
