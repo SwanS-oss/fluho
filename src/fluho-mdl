@@ -227,29 +227,28 @@ get_versions ()
   local vmajor=${2:-[0-9]*}
   local vminor=${3:-[0-9]*}
   local vrev=${4:-[0-9]*}
-  
-  ## Protection when users uses * as wildcard to list any version component (v1.1.*-alpha)
-  ## NOTE: User should leave empty the field instead of using *, to avoid
-  ## bash expansion of * to all files in dir. (v1.1.-alpha)
-  #[ "$vmajor" == "*" ] && vmajor="[0-9]*"
-  #[ "$vminor" == "*" ] && vminor="[0-9]*"
-  #[ "$vrev" == "*" ] && vrev="[0-9]*"
+  local vstatus=$5
+
+  local brversions
+  local tagversions
+  local versions
   
   case $purpose in
     general ) 
       [[ "$vrev" == "[0-9]*" && "$vstatus" == "" ]] && \
       # Discard branches not from fluho
-      local versions="`vcs_get_branches "dev/v${vmajor}\.${vminor}" \
+      brversions="`vcs_get_branches "dev/v${vmajor}\.${vminor}" \
       | sed 's%dev/%%g'`"
+      vstatus=${vstatus:-(alpha|beta|rc|stable)}
       # Discard tags not from fluho
-      local vstatus=${5:-(alpha|beta|rc|stable)}
-      #[ "$vstatus" == "*" ] && vstatus="(alpha|beta|rc|stable)"
-      if [ "$versions" != "" ]; then
-        versions="${versions}\n`vcs_get_tags \
-        | grep -E "^v${vmajor}\.${vminor}\.${vrev}-${vstatus}$"`"
+      tagversions="`vcs_get_tags \
+      | grep -E "^v${vmajor}\.${vminor}\.${vrev}-${vstatus}$"`"
+      if [[ "$brversions" != "" && "$tagversions" != "" ]]; then
+        versions="${brversions}\n${tagversions}"
+      elif [ "$brversions" != "" ]; then
+        versions="${brversions}"
       else
-        versions="`vcs_get_tags \
-        | grep -E "^v${vmajor}\.${vminor}\.${vrev}-${vstatus}$"`"
+        versions="${tagversions}"
       fi
       echo -e "$versions" | sort --version-sort
       ;;
@@ -260,8 +259,7 @@ get_versions ()
       | sort --version-sort
       ;;
     testing ) 
-      local vstatus=${5:-[abr]*[ac]}
-      [ "$vstatus" == "*" ] && vstatus="[abr]*[ac]"
+      local vstatus=${vstatus:-[abr]*[ac]}
       vcs_get_tags "v${vmajor}\.${vminor}\.${vrev}-${vstatus}" \
       | sort --version-sort
       ;;
