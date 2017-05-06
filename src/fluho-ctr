@@ -343,20 +343,26 @@ Checking out to the version: v${vmajor}.${vminor}.${vrev}-${vstatus}"
         # There was empty needed field or vstatus conflict
         
         echo "\
-Automatically choosing the latest version in production for given data."
-      
-        latestversion=`get_latestversion production \
-          "${vmajor}" "${vminor}" "${vrev}" "${vstatus}"`
+error: Version not completely specified as {major}.{minor}.{rev}-stable" >&2
+        show_checkoutversion_suggestion production "$vmajor" "$vminor" \
+          "$vrev" "stable"
+        exit 1
+                
+#        echo "\
+#Automatically choosing the latest version in production for given data."
+#      
+#        latestversion=`get_latestversion production \
+#          "${vmajor}" "${vminor}" "${vrev}" "${vstatus}"`
 
-        if [ "$latestversion" == "" ]; then
-          echo "\
-error: Given data did not match any released version for production." >&2
-          exit 1
-        else
-          echo "\
-Checking out to the version: ${latestversion}"
-          vcs_checkout "${latestversion}"
-        fi
+#        if [ "$latestversion" == "" ]; then
+#          echo "\
+#error: Given data did not match any released version for production." >&2
+#          exit 1
+#        else
+#          echo "\
+#Checking out to the version: ${latestversion}"
+#          vcs_checkout "${latestversion}"
+#        fi
         
       else
         # There was no empty field
