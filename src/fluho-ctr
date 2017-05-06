@@ -174,6 +174,9 @@ do_list()
 do_status()
 {
   local currentpurpose=`get_currentpurpose`
+  local stage_txt
+  local vtype_txt
+  local latestvrev_txt
   local output=""
 
   if ! is_initialized; then
@@ -198,54 +201,47 @@ Not in a version"
       ;;
   esac
   
-  local currentversion=`get_currentversion`
-  
+  local currentversion="`get_currentversion`"
+  local vmajor="`extract_vmajor $currentversion`"
+  local vminor="`extract_vminor $currentversion`"
+ 
   output="${output}, on version $currentversion"
+  
+  echo "$output"
   
   case "`get_vtype $currentversion`" in
     cuttingedge )
-      output="${output}, type cutting-edge  (head in major and head in minor)"
+      output="Version type is cutting-edge (head in major and head in minor)"
       ;;
     maintenance1 )
-      output="${output}, type maintenance-1  (only head in minor)"
+      output="Version type is maintenance-1 (only head in minor)"
       ;;
     maintenance2 )
-      output="${output}, type maintenance-2  (not head in minor)"
+      output="Version type is maintenance-2 (not head in minor)"
       ;;
   esac
   
-  if [[ "$currentpurpose" == "testing" || "$currentpurpose" == "production" ]];
-    then
-    if is_latestvrev $currentversion; then 
-      output="${output}, in latest revision"
+  echo "$output"
+  
+  local latestvrev="`get_latestvrev "$vmajor" "$vminor" "general"`"
+  
+  if [[ "$currentpurpose" == "development" ]]
+  then
+    if [ "$latestvrev" != "" ]; then
+      output="The latest revision is '${latestvrev}'. \
+      The latest status is '`get_latestvstatus "$vmajor" "$vminor" "general"`'"
     else
-      output="${output}, not in latest revision"
+      output="Revision has not been released yet"
+    fi
+  else
+    if is_latestvrev $currentversion; then 
+      output="You are in the latest revision"
+    else
+      output="You are not in the latest revision (which is ${latestvrev})"
     fi
   fi
   
   echo $output
-  
-  local vmajor=`extract_vmajor $currentversion`
-  local vminor=`extract_vminor $currentversion`
-  
-  local latestversion_test=`get_latestversion testing "$vmajor" "$vminor"` 
-  if [ "$latestversion_test" != "" ]; then
-    echo "\
-Latest revision of v${vmajor}.${vminor} released for testing: $latestversion_test"
-  else
-    echo "\
-Not revision of v${vmajor}.${vminor} released for testing yet."
-  fi
-  
-  local latestversion_prod=`get_latestversion production "$vmajor" "$vminor"`
-  if [ "$latestversion_prod" != "" ]; then
-    echo "\
-Latest revision of v${vmajor}.${vminor} released for production: $latestversion_prod"
-  else
-    echo "\
-Not revision of v${vmajor}.${vminor} released for production yet."
-  fi
-
 }
 
 
@@ -348,22 +344,6 @@ error: Version not completely specified as {major}.{minor}.{rev}-stable" >&2
           "$vrev" "stable"
         exit 1
                 
-#        echo "\
-#Automatically choosing the latest version in production for given data."
-#      
-#        latestversion=`get_latestversion production \
-#          "${vmajor}" "${vminor}" "${vrev}" "${vstatus}"`
-
-#        if [ "$latestversion" == "" ]; then
-#          echo "\
-#error: Given data did not match any released version for production." >&2
-#          exit 1
-#        else
-#          echo "\
-#Checking out to the version: ${latestversion}"
-#          vcs_checkout "${latestversion}"
-#        fi
-        
       else
         # There was no empty field
       
@@ -372,6 +352,10 @@ error: Version not completely specified as {major}.{minor}.{rev}-stable" >&2
           echo "\
 error: v${vmajor}.${vminor}.${vrev}-stable did not match any released \
 version for production." >&2
+          if [[ "$vstatus" == "" && "$vrev" != "" ]]; then
+            show_checkoutversion_suggestion "testing" "$vmajor" "$vminor" \
+              "$vrev"
+          fi
           exit 1
         else
           echo "\
@@ -385,12 +369,15 @@ Checking out to the version: v${vmajor}.${vminor}.${vrev}-stable"
     "" )
       echo "\
 error: Version must be specified" >&2
+      echo
       show_checkoutversion_suggestion development "$vmajor" "$vminor" \
-          "$vrev" "$vstatus"
+        "$vrev" "$vstatus"
+      echo
       show_checkoutversion_suggestion testing "$vmajor" "$vminor" \
-          "$vrev" "$vstatus"
+        "$vrev" "$vstatus"
+      echo
       show_checkoutversion_suggestion production "$vmajor" "$vminor" \
-          "$vrev" "$vstatus"
+        "$vrev" "$vstatus"
       ;;
     
     * )
