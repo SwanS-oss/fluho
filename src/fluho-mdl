@@ -98,6 +98,14 @@ exist_version()
   local vstatus=$5
 
   case $purpose in
+    general )
+      if vcs_exist_branch "dev/v${vmajor}.${vminor}" \
+      || vcs_exist_tag "v${vmajor}.${vminor}.${vrev}-${vstatus}"; then
+        return 0
+      else
+        return 1
+      fi
+      ;;
     development ) 
       vcs_exist_branch "dev/v${vmajor}.${vminor}"
       ;;
@@ -250,23 +258,20 @@ get_versions ()
       else
         versions="${tagversions}"
       fi
-      echo -e "$versions" | sort --version-sort
+      echo -e "$versions"
       ;;
     development ) 
       [[ "$vrev" == "[0-9]*" && "$vstatus" == "" ]] && \
       # Discard branches not from fluho
-      vcs_get_branches "dev/v${vmajor}\.${vminor}" | sed 's%dev/%%g' \
-      | sort --version-sort
+      vcs_get_branches "dev/v${vmajor}\.${vminor}" | sed 's%dev/%%g'
       ;;
     testing ) 
       local vstatus=${vstatus:-[abr]*[ac]}
-      vcs_get_tags "v${vmajor}\.${vminor}\.${vrev}-${vstatus}" \
-      | sort --version-sort
+      vcs_get_tags "v${vmajor}\.${vminor}\.${vrev}-${vstatus}"
       ;;
     production ) 
       [[ "$vstatus" == "" || "$vstatus" == "stable" ]] && \
-      vcs_get_tags "v${vmajor}\.${vminor}\.${vrev}-stable" \
-      | sort --version-sort
+      vcs_get_tags "v${vmajor}\.${vminor}\.${vrev}-stable"
       ;;
     * )
       echo "
@@ -566,7 +571,7 @@ get_vstatus ()
   local vminor=$2
   local vrev=$3
   local purpose=${4:-general}
- 
+  
   case $purpose in
     general ) 
       vcs_get_tags "v${vmajor}\.${vminor}\.${vrev}-[abrs]*[ace]" | sort | \
@@ -598,7 +603,35 @@ get_latestversion ()
   local vstatus=$5
   
   case $purpose in
-    development | general )
+    general )
+      if [ "$vrev" == "" ]; then
+        get_latestversion "development" "$vmajor" "$vminor"
+      else
+        purpose=general
+        if [ "$vmajor" == "" ]; then
+          vmajor=`get_latestvmajor "$purpose"`
+          vminor=`get_latestvminor "$vmajor" "$purpose"`
+          vrev=`get_latestvrev "$vmajor" "$vminor" "$purpose"`
+          vstatus=`get_vstatus "$vmajor" "$vminor" "$vrev" "$purpose"`
+        elif [ "$vminor" == "" ]; then
+          vminor=`get_latestvminor "$vmajor" "$purpose"`
+          vrev=`get_latestvrev "$vmajor" "$vminor" "$purpose"`
+          vstatus=`get_vstatus "$vmajor" "$vminor" "$vrev" "$purpose"`
+        elif [ "$vrev" == "" ]; then
+          vrev=`get_latestvrev "$vmajor" "$vminor" "$purpose"`
+          vstatus=`get_vstatus "$vmajor" "$vminor" "$vrev" "$purpose"`
+        elif [ "$vstatus" == "" ]; then
+          vstatus=`get_vstatus "$vmajor" "$vminor" "$vrev" "$purpose"`
+        fi
+        if [ "$vstatus" != "" ] \
+        && exist_version "$purpose" "${vmajor}" "${vminor}" "${vrev}" "${vstatus}"
+        then
+          echo "v${vmajor}.${vminor}.${vrev}-${vstatus}"
+        fi
+      fi
+      ;;
+      
+    development )
       if [ "$vmajor" == "" ]; then
         vmajor=`get_latestvmajor "$purpose"`
         vminor=`get_latestvminor "$vmajor" "$purpose"`
@@ -626,8 +659,9 @@ get_latestversion ()
       elif [ "$vstatus" == "" ]; then
         vstatus=`get_vstatus "$vmajor" "$vminor" "$vrev" "$purpose"`
       fi
-      if [ "$vstatus" != "" ] && \
-        exist_version $purpose ${vmajor} ${vminor} ${vrev} ${vstatus}; then
+      if [ "$vstatus" != "" ] \
+      && exist_version "$purpose" "${vmajor}" "${vminor}" "${vrev}" "${vstatus}"
+      then
         echo "v${vmajor}.${vminor}.${vrev}-${vstatus}"
       fi
       ;;
