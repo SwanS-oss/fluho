@@ -129,14 +129,14 @@ do_list()
   
   local currentversions="`get_currentversions`"
   
-  if [ "$OPTLATEST" != true ]; then
-    local versions="`get_versions "$OPTPURPOSE" "$vmajor" "$vminor" "$vrev" "$vstatus"`"
-  else
-    [ "$OPTPURPOSE" == "general" ] && OPTPURPOSE="development"
-    local versions="`get_latestversion "$OPTPURPOSE" "$vmajor" "$vminor" "$vrev" "$vstatus"`"
-  fi 
+  local versions="`get_versions "$OPTPURPOSE" "$vmajor" "$vminor" "$vrev" \
+    "$vstatus" | sort --version-sort`"
   
-  [ "$versions" != "" ] && echo "$versions" \
+  if [ "$OPTLATEST" == true ]; then
+    versions="`echo "$versions" | tail -n 1`"
+  fi
+
+ [ "$versions" != "" ] && echo "$versions" \
   | while IFS='' read -r one_version || [[ -n "$one_version" ]]; do
     if [ "`echo "$currentversions" | grep "^${one_version}$"`" == "" ]; then
       echo "  $one_version"
