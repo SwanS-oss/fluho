@@ -65,6 +65,32 @@ do_releasefortesting_extra()
 }
 
 
+show_releasefortesting_extra_success()
+{
+  # This is the message that will be shown after performing the extra actions
+  # for a testing version release if they have finished with success
+  
+  echo "\
+
+"
+  
+  return 0
+}
+
+
+show_releasefortesting_extra_error()
+{
+  # This is the message that will be shown after performing the extra actions
+  # for a testing version release if they have finished with errors
+  
+  echo "\
+
+"
+  
+  return 0
+}
+
+
 do_releaseforproduction_extra()
 {
   # Program here extra action to perform after releasing a version for 
@@ -105,28 +131,3 @@ show_releaseforproduction_extra_error()
   return 0
 }
 
-
-show_releasefortesting_extra_success()
-{
-  # This is the message that will be shown after performing the extra actions
-  # for a testing version release if they have finished with success
-  
-  echo "\
-
-"
-  
-  return 0
-}
-
-
-show_releasefortesting_extra_error()
-{
-  # This is the message that will be shown after performing the extra actions
-  # for a testing version release if they have finished with errors
-  
-  echo "\
-
-"
-  
-  return 0
-}
