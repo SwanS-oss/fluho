@@ -365,16 +365,10 @@ get_currentversions ()
   
   if [ "$currentpurpose" == "development" ]; then
     # Discard branches not corresponding to version and echo version number
-    echo $currentversion_vmajorminor
+    echo -e "${currentversion_vmajorminor}\n`get_currenttags`"
   else
     # Discard tags not from fluho and echo version number
-    if [[ "$currentbranch" =~ ^(test/v|v)[0-9]*$ ]]; then
-      local vmajor=`extract_vmajor $currentversion_vmajorminor`
-      local vminor=`extract_vminor $currentversion_vmajorminor`
-      get_currenttags_forvmajorminor "$vmajor" "$vminor"
-    else
-      get_currenttags
-    fi
+    get_currenttags
   fi
   
   # Returns versions list. Every version begins with v.
