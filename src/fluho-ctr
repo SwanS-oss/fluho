@@ -537,6 +537,9 @@ error: Cannot be successfully released because a failure merging branches" >&2;\
             exit 1 )
           ;;
       esac
+      
+      do_releasefortesting_extra && show_releasefortesting_extra_success \
+      || show_releasefortesting_extra_error
       ;;
 
     stable )  # Release for production
@@ -630,6 +633,9 @@ error: Cannot be successfully released because a failure merging branches" >&2;\
             ;;
         esac
       fi 
+      
+      do_releaseforproduction_extra && show_releaseforproduction_extra_success \
+      || show_releaseforproduction_extra_error
       ;;
       
     * )
