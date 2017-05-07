@@ -1,0 +1,132 @@
+#!/bin/bash
+
+
+
+
+### CONFIGURATION VARIABLES
+
+CUTTINGEDGE_BRANCH="master"  # Name of branch that will contain latest prod ver
+
+
+USE_REMOTE=true  # Share version changes in remote repo or work only locally
+USE_REMOTEFETCH=true  # Perform checking over remote using fetched local refs 
+REMOTE_ALIAS="origin"  # Alias of the remote repository
+
+
+
+
+### CUSTOMIZABLE FUNCTIONS
+
+show_releasefortesting_warning()
+{
+  # This is the message that will be shown before asking for confirmation to
+  # release a version for testing (alpha, beta, rc) 
+  
+  echo "\
+Before releasing, make sure that the following points are met:
+* Documentation has been updated
+* Changes that require increasing minor or major number have not been introduced
+* Code compiles correctly
+"
+  
+  return 0
+}
+
+
+show_releaseforproduction_warning()
+{
+  # This is the message that will be shown before asking for confirmation to
+  # release a version for production (stable) 
+  
+  echo "\
+Before releasing, make sure that the following points are met:
+* Documentation has been updated
+* Changes that require increasing minor or major number have not been introduced
+* Code compiles correctly
+* All tests have been passed
+"
+  
+  return 0
+}
+
+
+do_releasefortesting_extra()
+{
+  # Program here extra action to perform after releasing a version for 
+  # testing (alpha, beta, rc), for example:
+  #   * Packing source code in a tarball and uploading it to a FTP
+  #   * Sending a notification by email
+  #
+  # This function should return 0 on success and 1 if failure
+  
+  
+  
+  return 0
+}
+
+
+do_releaseforproduction_extra()
+{
+  # Program here extra action to perform after releasing a version for 
+  # production (stable), for example:
+  #   * Packing source code in a tarball and uploading it to a FTP
+  #   * Sending a notification by email
+  #
+  # This function should return 0 on success and 1 if failure
+  
+  
+  
+  return 0
+}
+
+
+show_releaseforproduction_extra_success()
+{
+  # This is the message that will be shown after performing the extra actions
+  # for a production (stable) version release if they have finished with success
+  
+  echo "\
+
+"
+  
+  return 0
+}
+
+
+show_releaseforproduction_extra_error()
+{
+  # This is the message that will be shown after performing the extra actions
+  # for a production (stable) version release if they have finished with errors
+  
+  echo "\
+
+"
+  
+  return 0
+}
+
+
+show_releasefortesting_extra_success()
+{
+  # This is the message that will be shown after performing the extra actions
+  # for a testing version release if they have finished with success
+  
+  echo "\
+
+"
+  
+  return 0
+}
+
+
+show_releasefortesting_extra_error()
+{
+  # This is the message that will be shown after performing the extra actions
+  # for a testing version release if they have finished with errors
+  
+  echo "\
+
+"
+  
+  return 0
+}
