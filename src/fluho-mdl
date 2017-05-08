@@ -27,8 +27,8 @@ exist_vmajor()
         return 0 || return 1
       ;;
     * )
-      echo "
-Error: Internal failure checking major number exists for purpose $purpose" >&2
+      echoerr "\
+internal: exist_vmajor() purpose $purpose"
       exit 1
       ;;
   esac
@@ -53,8 +53,8 @@ exist_vminor()
       vcs_exist_tag "v${vmajor}\.${vminor}\.[0-9]*-stable"
       ;;
     * )
-      echo "
-Error: Internal. exist_vminor() major:$major,purpose:$purpose" >&2
+      echoerr "\
+internal: exist_vminor() major:$major,purpose:$purpose"
       exit 1
       ;;
   esac
@@ -80,8 +80,8 @@ exist_vrev()
       vcs_exist_tag "v${vmajor}\.${vminor}\.${vrev}-stable"
       ;;
     * )
-      echo "
-Error: Internal. exist_vrev() ${major}.${minor},purpose:$purpose" >&2
+      echoerr "\
+internal: exist_vrev() ${major}.${minor},purpose:$purpose"
       exit 1
       ;;
   esac
@@ -128,8 +128,8 @@ exist_version()
       ;;
 
     * )
-      echo "
-Error: Internal. exist_version() ${major}.${minor},purpose:$purpose" >&2
+      echoerr "\
+internal: exist_version() ${major}.${minor},purpose:$purpose"
       exit 1
       ;;
   esac
@@ -274,8 +274,8 @@ get_versions ()
       vcs_get_tags "v${vmajor}\.${vminor}\.${vrev}-stable"
       ;;
     * )
-      echo "
-error: internal. get_versions() for $purpose" >&2
+      echoerr "\
+internal: get_versions() for $purpose"
       exit 1
       ;;
   esac
@@ -418,8 +418,8 @@ get_currentpurpose ()
         echo production
         ;;
       * )
-        echo "\
-error: internal. get_currentpurpose() with currentbranch: $currentbranch" >&2
+        echoerr "\
+internal: get_currentpurpose() with currentbranch: $currentbranch"
         ;;
     esac
   elif [ "$currenttag" != "" ]; then
@@ -432,8 +432,8 @@ error: internal. get_currentpurpose() with currentbranch: $currentbranch" >&2
           echo production
           ;;
         * )
-        echo "\
-error: internal. get_currentpurpose() with currenttag: $currentbranch" >&2 
+        echoerr "\
+internal: get_currentpurpose() with currenttag: $currentbranch"
           ;;
       esac
   fi
@@ -461,8 +461,8 @@ get_latestvmajor ()
         sort --version-sort | tail -n 1 | extract_vmajor
       ;;
     * )
-      echo "
-error: internal. get_latestvmajor() for purpose: $purpose" >&2
+      echoerr "\
+internal: get_latestvmajor() for purpose: $purpose"
       exit 1
       ;;
   esac
@@ -489,8 +489,8 @@ get_latestvminor ()
         sort --version-sort | tail -n 1 | extract_vminor
       ;;
     * )
-      echo "
-error: internal. get_latestvminor() for $purpose" >&2
+      echoerr "\
+internal: get_latestvminor() for $purpose"
       exit 1
       ;;
   esac
@@ -519,8 +519,8 @@ get_latestvrev ()
         | sort --version-sort | tail -n 1 | extract_vrev
       ;;
     * )
-      echo "
-error: internal. get_latestvrev() for $purpose" >&2
+      echoerr "\
+internal: get_latestvrev() for $purpose"
       exit 1
       ;;
   esac
@@ -550,8 +550,8 @@ get_latestvstatus ()
       | extract_vstatus | sort | tail -n 1
       ;;
     *)
-      echo "
-error: internal. get_latestvstatus() for $purpose" >&2
+      echoerr "\
+internal: get_latestvstatus() for $purpose"
       exit 1
       ;;
   esac
@@ -580,8 +580,8 @@ get_vstatus ()
         tail -n 1 | extract_vstatus
       ;;
     *)
-      echo "
-error: internal. get_vstatus() for $purpose" >&2
+      echoerr "\
+internal: get_vstatus() for $purpose"
       exit 1
       ;;
   esac
@@ -661,8 +661,8 @@ get_latestversion ()
       ;;
     
     * )
-      echo "
-error: internal. get_latestversion() for $purpose" >&2
+      echo "\
+internal: get_latestversion() for $purpose"
       exit 1
       ;;
   esac

@@ -13,40 +13,6 @@
 #   - upvars.sh.h
 
 
-#### Debug ###
-
-echodbg() {
-  "$ENABLE_DBG" && echo -en "DBG:$1: $2" > /dev/tty
-}
-shopt -s expand_aliases  # enable alias expansion
-alias echodbg='echodbg ${FUNCNAME}'
-
-
-
-#### Permissions ###
-
-exitIfNotRoot() {
-  if [ $EUID -ne 0 ]; then
-     echo "This script must be run as root or with sudo." 1>&2
-     echo "EXAMPLE: $ sudo $0"
-     exit 1
-  fi
-}
-
-
-exitIfNotSudo() {
-  if [ $EUID -ne 0 ]; then
-     echo "This script must be run with sudo" 1>&2
-     echo "EXAMPLE: $ sudo $0"
-     exit 1
-  elif [ "$HOME" = "/root" ]; then
-     echo "\
-This script must be run with sudo from the user's account, 
-but not from the root account" 1>&2
-     exit 1
-  fi
-}
-
 
 
 #### Paths ###
@@ -74,7 +40,129 @@ getThisScriptPwd() {
 
 
 
+
+#### In / Out ###
+
+
+echodbg() {
+  "$ENABLE_DBG" && echo -en "DBG:$1: $2" > /dev/tty
+}
+shopt -s expand_aliases  # enable alias expansion
+alias echodbg='echodbg ${FUNCNAME}'
+
+
+echoerr() {
+  echo "error: $@" >&2
+}
+
+
+echowarn() {
+  echo "warning: $@" >&2
+}
+
+
+shwcmd() {
+  # Execute a command showing it in the console  (emulates set -x , set +x)
+
+  echo "+ $@"   # Easier than using set -x , set +x for a single command...
+  "$@"
+
+  return $?
+  # RETURN the value returned by the command
+}
+
+
+showDesktopNotification() {
+  notify-send --hint=int:transient:1 "$1"
+}
+
+
+askYes() {
+  # TODO
+  # ARGS IN:
+  local textToShow="$1"
+  local defaultOption="$2"  # "y" or "n"
+  
+  local output="$textToShow"
+  local option="invalid"
+  
+  while [[ ! "$option" =~ (^$|^[NnYy].*$) ]]; do
+    if [[ "$defaultOption" =~ ^[Nn].*$ ]]; then
+      echo -n "${textToShow} [yes/No]? "
+    else
+      echo -n "${textToShow} [Yes/no]? "
+    fi
+    
+    read option
+  done
+  
+  if isYes "${option}" \
+  || [[ ! "$defaultOption" =~ ^[Nn].*$ && "$option" == "" ]]; then 
+    return 0
+  else
+    return 1 
+  fi
+
+}
+
+
+doPause() {
+  # ARGS IN:
+  local textToShow="$1"
+  
+  echo -en "$textToShow"
+  read -sn 1
+}
+
+
+bytes2Human() {
+  if [ "$1" != "" ]; then echo "$1" | $FUNCNAME; else
+    awk '
+      {sum=$1}
+      END{split("B KB MB GB TB PB",type);
+         for(i=5; y<1; i--)
+             y = sum / (2^(10*i));
+
+         print y type[i+2]
+      }
+    '
+  fi
+  #RETURN the size value in the most suitable units and the units
+}
+
+
+
+
+#### Permissions ###
+
+
+exitIfNotRoot() {
+  if [ $EUID -ne 0 ]; then
+     echo "This script must be run as root or with sudo." 1>&2
+     echo "EXAMPLE: $ sudo $0"
+     exit 1
+  fi
+}
+
+
+exitIfNotSudo() {
+  if [ $EUID -ne 0 ]; then
+     echo "This script must be run with sudo" 1>&2
+     echo "EXAMPLE: $ sudo $0"
+     exit 1
+  elif [ "$HOME" = "/root" ]; then
+     echo "\
+This script must be run with sudo from the user's account, 
+but not from the root account" 1>&2
+     exit 1
+  fi
+}
+
+
+
+
 #### Files ###
+
 
 isEmptyTheFile() {
   # ARGS IN:
@@ -130,51 +218,9 @@ findEqualFiles() {
 
 
 
-#### In / Out ###
-
-showDesktopNotification() {
-  notify-send --hint=int:transient:1 "$1"
-}
-
-
-shwcmd() {
-  # Execute a command showing it in the console  (emulates set -x , set +x)
-
-  echo "+ $@"   # Easier than using set -x , set +x for a single command...
-  "$@"
-
-  return $?
-  # RETURN the value returned by the command
-}
-
-
-bytes2Human() {
-  if [ "$1" != "" ]; then echo "$1" | $FUNCNAME; else
-    awk '
-      {sum=$1}
-      END{split("B KB MB GB TB PB",type);
-         for(i=5; y<1; i--)
-             y = sum / (2^(10*i));
-
-         print y type[i+2]
-      }
-    '
-  fi
-  #RETURN the size value in the most suitable units and the units
-}
-
-
-doPause() {
-  # ARGS IN:
-  local textToShow="$1"
-  
-  echo -en "$textToShow"
-  read -sn 1
-}
-
-
 
 #### Data validation ###
+
 
 isInteger() {
   if [ "$1" != "" ]; then echo "$1" | $FUNCNAME; else
@@ -190,7 +236,10 @@ isInteger() {
 }
 
 
+
+
 #### Streams manipulation ###
+
 
 removeBlankLinesFromTheBeginning() {
   if [ "$1" != "" ]; then echo "$1" | $FUNCNAME; else
@@ -217,7 +266,9 @@ removeCommentedLines() {
 
 
 
+
 #### yes/no answers ###
+
 
 isYes() {
   echo "$1" | grep -i "^y" &> /dev/null
@@ -227,7 +278,9 @@ isYes() {
 
 
 
+
 #### Listing ###
+
 
 folders2List() {
   # ARG IN/OUT:
@@ -322,7 +375,9 @@ readOpt() {
 
 
 
+
 #### Sections ###
+
 
 addFileSection() {
   # Add a delimited section with content to a file
@@ -408,7 +463,9 @@ fileSectionExists() {
 
 
 
+
 #### Networking ###
+
 
 string2dnsqname() {
   # Receive a domain name (www.google.es) and converts it to DNS qname format
@@ -432,7 +489,9 @@ string2dnsqname() {
 
 
 
+
 #### Others ###
+
 
 randomTmpFile() {
   # ARGS IN:
@@ -447,3 +506,5 @@ randomTmpFile() {
   echo "${TMP_DIR}/${rndFilename}"
   # RETURN The full file path (dir and filename)
 }
+
+

@@ -28,7 +28,7 @@ getThisScriptPwd() {
 # INCLUDES
 
 #. ${THIS_SCRIPT_PWD}/upvars-bash
-. ${THIS_SCRIPT_PWD}/tools-bash
+. ${THIS_SCRIPT_PWD}/tools-bash.0.6.0
 . ${THIS_SCRIPT_PWD}/fluho-ctr
 . ${THIS_SCRIPT_PWD}/fluho-mdl
 . ${THIS_SCRIPT_PWD}/fluho-mdl-git
@@ -111,29 +111,29 @@ General arguments:
 
 show_option_error()
 {
-  echo "\
-error: Bad argument. Take a look at:
+  echoerr "\
+Bad argument. Take a look at:
 
-    $ ${0##*/} --help" >&2
+    $ ${0##*/} --help"
 }
 
 
 show_notinitialized_error()
 {
-  echo "\
-error: Not under fluho version control. Use:
+  echoerr "\
+Not under fluho version control. Use:
 
-    $ ${0##*/} init" >&2
+    $ ${0##*/} init"
 }
 
 
 show_versionformat_error()
 {
   local version=$1
-  echo "\
-error: Version '$version' has invalid format.
+  echoerr "\
+Version '$version' has invalid format.
 Use integer for major, minor and rev. Use alpha|beta|rc|stable for status.
-For listing, leave a field empty as a wildcard (ex. v1..-alpha)" >&2
+For listing, leave a field empty as a wildcard (ex. v1..-alpha)"
 }
 
 
@@ -182,8 +182,8 @@ To checkout to the version for ${purpose} matching the given data, use:
 
 note: v${vmajor}.${vminor}.${vrev}-${vstatus} does NOT currently exist."
     elif [ "$vmajor" != "" ]; then
-      echo "\
-Given data did not match any version released for ${purpose}." >&2
+      echoerr "\
+Given data did not match any version released for ${purpose}."
     else
       echo "\
 Not version released for $purpose yet."
@@ -312,8 +312,8 @@ main()
   fi
 
   if ! vcs_is_inside_work_tree; then
-    echo "\
-error: Not under a version control system" >&2
+    echoerr "\
+Not under a version control system"
     exit 1
   fi
   
@@ -359,20 +359,21 @@ error: Not under a version control system" >&2
                         ;;
       --)               shift ; break
                         ;;
-      *)                echo "Internal error!" ; exit 1
+      *)                echoerr "Internal error!" ; exit 1
     esac
     shift
   done
 
   if [ "$USE_REMOTE" == true ] && ! vcs_is_remote_configured; then
-    echo "\
-warning: Remote repository '$REMOTE_ALIAS' not configured. Now working locally.
+    echowarn "\
+Remote repository '$REMOTE_ALIAS' not configured. Now working locally.
 To avoid this message, use --noremote argument or set USE_REMOTE config to false
-" >&2
+"
     USE_REMOTE=false
   fi
 
   if [ $# -eq 0 ]; then
+    # No action specified
     show_help
     exit 1
   fi
@@ -414,8 +415,8 @@ To avoid this message, use --noremote argument or set USE_REMOTE config to false
                           do_init $version
                           do_checkout $version
                         else
-                          echo "\
-error: Unadmitted purpose. Only version for development can be initialized." >&2
+                          echoerr "\
+Unadmitted purpose. Only version for development can be initialized."
                         fi
                       else
                         do_checkout $version
@@ -429,7 +430,7 @@ error: Unadmitted purpose. Only version for development can be initialized." >&2
                       fi
                       do_release $version
                       ;;
-      sync )          do_sync; exit 0
+      sync )          do_sync
                       ;;
       help )          show_help; exit 0
                       ;;
