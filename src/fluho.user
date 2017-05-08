@@ -70,9 +70,9 @@ show_releasefortesting_extra_success()
   # This is the message that will be shown after performing the extra actions
   # for a testing version release if they have finished with success
   
-  echo "\
+#  echo "\
 
-"
+#"
   
   return 0
 }
@@ -83,9 +83,9 @@ show_releasefortesting_extra_error()
   # This is the message that will be shown after performing the extra actions
   # for a testing version release if they have finished with errors
   
-  echo "\
+#  echo "\
 
-"
+#"
   
   return 0
 }
@@ -111,9 +111,9 @@ show_releaseforproduction_extra_success()
   # This is the message that will be shown after performing the extra actions
   # for a production (stable) version release if they have finished with success
   
-  echo "\
+#  echo "\
 
-"
+#"
   
   return 0
 }
@@ -124,9 +124,9 @@ show_releaseforproduction_extra_error()
   # This is the message that will be shown after performing the extra actions
   # for a production (stable) version release if they have finished with errors
   
-  echo "\
+#  echo "\
 
-"
+#"
   
   return 0
 }
