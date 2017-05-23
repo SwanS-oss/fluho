@@ -78,10 +78,9 @@ showDesktopNotification() {
 
 
 askYes() {
-  # TODO
   # ARGS IN:
   local textToShow="$1"
-  local defaultOption="$2"  # "y" or "n"
+  local defaultOption="${2:-"y"}"  # "y" or "n"
   
   local output="$textToShow"
   local option="invalid"
