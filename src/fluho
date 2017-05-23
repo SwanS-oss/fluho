@@ -1,5 +1,19 @@
 #!/bin/bash
 
+###############################################################################
+# Fluho. v0.1-alpha
+#
+# Written by Juan Jose Castro Sotelo
+# Licensed under terms of GPLv3
+#
+# Changelog:
+# - v0.1.0:
+#   Initial version
+###############################################################################
+
+
+
+
 VERSION="1.0-alpha"
 
 ENABLE_DBG=false
@@ -100,7 +114,7 @@ Actions:
   help
     Show this help
     
-General arguments:
+General options:
   --remote {remote_alias}
     Force to perform actions in the remote repository with alias {remote_alias}
   --noremote
@@ -112,7 +126,7 @@ General arguments:
 show_option_error()
 {
   echoerr "\
-Bad argument. Take a look at:
+Bad action, option or argument. Take a look at:
 
     $ ${0##*/} --help"
 }
@@ -307,7 +321,7 @@ main()
   OPTPURPOSE=""  # development, testing, production
   
   if [ $# -eq 0 ]; then
-    show_help
+    show_option_error
     exit 1
   fi
 

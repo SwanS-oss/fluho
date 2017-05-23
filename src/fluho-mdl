@@ -1,6 +1,18 @@
 #!/bin/bash
 
 
+###############################################################################
+# Fluho
+# Model (high level)
+#
+# Written by Juan Jose Castro Sotelo
+# Licensed under terms of GPLv3
+#
+###############################################################################
+
+
+
+
 is_initialized()
 {
   exist_version "testing" "0" "0" "0" "alpha"

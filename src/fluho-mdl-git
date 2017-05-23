@@ -1,6 +1,18 @@
 #!/bin/bash
 
 
+###############################################################################
+# Fluho
+# Model (low level for Git)
+#
+# Written by Juan Jose Castro Sotelo
+# Licensed under terms of GPLv3
+#
+###############################################################################
+
+
+
+
 vcs_is_inside_work_tree()
 {
   git rev-parse --is-inside-work-tree &>/dev/null
