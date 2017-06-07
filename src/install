@@ -1,0 +1,162 @@
+#!/bin/bash
+
+###############################################################################
+# Fluho
+# Installer
+#
+# Written by Juan Jose Castro Sotelo
+# Licensed under terms of GPLv3
+#
+###############################################################################
+
+
+
+
+DESTDIR_DFL="/opt/fluho"  # Application installation dir inside rootfs
+ROOTDIR_DFL=""  # Rootfs path (for deb building, jails). Empty is equal to /
+
+
+
+
+exitIfNotRoot() {
+  if [ $EUID -ne 0 ]; then
+     echo "\
+This script must be run as root or with sudo.
+
+Example: 
+
+    $ sudo ${0##*/}" 1>&2
+     exit 1
+  fi
+}
+
+
+show_usage()
+{
+  echo "\
+Usage: ${0##*/} <options>"
+}
+
+
+show_help()
+{
+  echo "\
+Install the application in the operating system
+[options]
+  -d, --destdir DIR
+    Target directory where the application will be installed
+    Default: $DESTDIR_DFL
+  -r, --root DIR
+    Set the root path of the operating system file system.
+    For example, /etc/environment will be searched in {DIR}/etc/environment
+    Default: ${ROOTDIR_DFL:-/}
+  -u, --uninstall
+    Uninstall the application from the operating system.
+  -h, --help
+    Show this information"
+}
+
+
+show_option_error()
+{
+  echo "\
+Bad action, option or argument. Take a look at:
+
+    $ ${0##*/} --help" >&2
+}
+
+
+
+
+do_install()
+{
+  ROOTDIR="${ROOTDIR:-$ROOTDIR_DFL}"
+  DESTDIR="${DESTDIR:-$DESTDIR_DFL}"
+  
+  [ "$ROOTDIR" != "" ] && ROOTDIR="${ROOTDIR}/"  # Get sure ROOTDIR ends with /
+
+  install --mode=774 fluho          "${ROOTDIR}${DESTDIR}"
+  install --mode=664 fluho.user     "${ROOTDIR}${DESTDIR}"
+  install --mode=664 fluho-ctr      "${ROOTDIR}${DESTDIR}"
+  install --mode=664 fluho-mdl      "${ROOTDIR}${DESTDIR}"
+  install --mode=664 fluho-mdl-git  "${ROOTDIR}${DESTDIR}"
+
+  echo "PATH=${DESTDIR}:${PATH}" >> "${ROOTDIR}/etc/environment"
+}
+
+
+do_uninstall()
+{
+  ROOTDIR="${ROOTDIR:-$ROOTDIR_DFL}"
+  #DESTDIR="${DESTDIR:-$DESTDIR_DFL}"
+
+  [ "$ROOTDIR" != "" ] && ROOTDIR="${ROOTDIR}/"  # Get sure ROOTDIR ends with /
+
+  if [ "$DESTDIR" == "" ]; then
+    whichpath="`which fluho`"
+  else
+    DESTDIR="$DESTDIR_DFL"
+  fi
+  
+  rm -f "${ROOTDIR}${DESTDIR}/fluho"
+  rm -f "${ROOTDIR}${DESTDIR}/fluho.user"
+  rm -f "${ROOTDIR}${DESTDIR}/fluho-ctr"
+  rm -f "${ROOTDIR}${DESTDIR}/fluho-mdl"
+  rm -f "${ROOTDIR}${DESTDIR}/fluho-mdl-git"
+  
+  sed -i '%^PATH=${DESTDIR}:.*%d' "${ROOTDIR}/etc/environment"
+}
+
+
+
+
+main()
+{
+  DESTDIR=""
+  ROOTDIR=""
+  OPTUNINSTALL=false
+  
+  
+  SHORT_OPTS=":d:r:uh"
+  LONG_OPTS="destdir:,root:,uninstall,help"
+  args=`getopt -o $SHORT_OPTS --long $LONG_OPTS -- "$@"`
+  if [ $? -ne 0 ]; then
+    show_option_error
+    exit 1
+  fi
+  eval set -- "$args"
+
+
+  while true ; do
+    case "$1" in
+      --destdir | -d )  shift
+                        DESTDIR="$1"
+                        ;;
+      --rootdir | -r )  shift
+                        ROOTDIR="$1"
+                        ;;
+      --uninstall | -u ) 
+                        OPTUNINSTALL=true
+                        ;;
+      --help | -h )     show_help; exit 0
+                        ;;
+      --)               shift ; break
+                        ;;
+      *)                echo "Internal error ($1)!" ; exit 1
+    esac
+    shift
+  done
+
+
+  exitIfNotRoot
+
+  if [ "$OPTUNINSTALL" == true ]; then
+    do_uninstall
+  else
+    do_install
+  fi
+
+}
+
+
+main "$@"
