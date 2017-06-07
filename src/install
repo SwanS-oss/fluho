@@ -12,7 +12,9 @@
 
 
 
-DESTDIR_DFL="/opt/fluho"  # Application installation dir inside rootfs
+APPNAME="fluho"
+
+DESTDIR_DFL="/opt/$APPNAME"  # Application installation dir inside rootfs
 ROOTDIR_DFL=""  # Rootfs path (for deb building, jails). Empty is equal to /
 
 
@@ -41,7 +43,7 @@ Usage: ${0##*/} <options>"
 show_help()
 {
   echo "\
-Install the application in the operating system
+Install the application '$APPNAME' in the operating system.
 [options]
   -d, --destdir DIR
     Target directory where the application will be installed
@@ -66,6 +68,40 @@ Bad action, option or argument. Take a look at:
 }
 
 
+isYes() {
+  echo "$1" | grep -i "^y" &> /dev/null
+  # Note: [ "$1" != "" ] && echo "$1" | $FUNCNAME || \ does not work for empty
+  # input. Tried cat, dd and read and "if then else". Nothing...
+}
+
+
+askYes() {
+  # ARGS IN:
+  local textToShow="$1"
+  local defaultOption="${2:-"y"}"  # "y" or "n"
+  
+  local output="$textToShow"
+  local option="invalid"
+  
+  while [[ ! "$option" =~ (^$|^[NnYy].*$) ]]; do
+    if [[ "$defaultOption" =~ ^[Nn].*$ ]]; then
+      echo -n "${textToShow} [yes/No]? "
+    else
+      echo -n "${textToShow} [Yes/no]? "
+    fi
+    
+    read option
+  done
+  
+  if isYes "${option}" \
+  || [[ ! "$defaultOption" =~ ^[Nn].*$ && "$option" == "" ]]; then 
+    return 0
+  else
+    return 1 
+  fi
+
+}
+
 
 
 do_install()
@@ -75,23 +111,34 @@ do_install()
   
   [ "$ROOTDIR" != "" ] && ROOTDIR="${ROOTDIR}/"  # Get sure ROOTDIR ends with /
   
-  mkdir -p "${ROOTDIR}${DESTDIR}" && \
-  install -v --mode=774 fluho          "${ROOTDIR}${DESTDIR}" && \
-  install -v --mode=664 fluho.user     "${ROOTDIR}${DESTDIR}" && \
-  install -v --mode=664 fluho-ctr      "${ROOTDIR}${DESTDIR}" && \
-  install -v --mode=664 fluho-mdl      "${ROOTDIR}${DESTDIR}" && \
-  install -v --mode=664 fluho-mdl-git  "${ROOTDIR}${DESTDIR}" && \
+  if ! askYes "This will install '$APPNAME' in '${ROOTDIR}${DESTDIR}'. Continue"
+  then
+    echo "Cancelled!"
+    exit 2
+  fi
+  
+  echo "Installing '${APPNAME}' in ${ROOTDIR}${DESTDIR}..."
 
-  sed -i "\%^PATH=${DESTDIR}:.*%d" "${ROOTDIR}/etc/environment" && \
-  echo "PATH=${DESTDIR}:${PATH}" >> "${ROOTDIR}/etc/environment" && \
-  echo "Success" || echo "Error"
+  mkdir -p "${ROOTDIR}${DESTDIR}" && \
+  install -v --mode=775   fluho              "${ROOTDIR}${DESTDIR}" && \
+  install -v --mode=664   fluho.user         "${ROOTDIR}${DESTDIR}" && \
+  install -v --mode=664   fluho-ctr          "${ROOTDIR}${DESTDIR}" && \
+  install -v --mode=664   fluho-mdl          "${ROOTDIR}${DESTDIR}" && \
+  install -v --mode=664   fluho-mdl-git      "${ROOTDIR}${DESTDIR}" && \
+  install -v --mode=664   tools-bash.0.6.0   "${ROOTDIR}${DESTDIR}" && \
+
+  echo "PATH=${DESTDIR}:${PATH}" > "${ROOTDIR}/etc/profile.d/${APPNAME}.sh" && \
+  echo "\
+Success
+
+Log-out and log-in in the terminal to use '$APPNAME' from any location." || \
+echo "Error"
 }
 
 
 do_uninstall()
 {
   ROOTDIR="${ROOTDIR:-$ROOTDIR_DFL}"
-  #DESTDIR="${DESTDIR:-$DESTDIR_DFL}"
 
   [ "$ROOTDIR" != "" ] && ROOTDIR="${ROOTDIR}/"  # Get sure ROOTDIR ends with /
 
@@ -105,15 +152,22 @@ do_uninstall()
     DESTDIR="$DESTDIR_DFL"
   fi
   
-  echo "Uninstalling fluho at ${ROOTDIR}${DESTDIR}"
+  if ! askYes "This will remove '$APPNAME' in '${ROOTDIR}${DESTDIR}'. Continue"
+  then
+    echo "Cancelled!"
+    exit 2
+  fi
+  
+  echo "Uninstalling '${APPNAME}' in ${ROOTDIR}${DESTDIR}..."
 
   rm -vf "${ROOTDIR}${DESTDIR}/fluho" && \
   rm -vf "${ROOTDIR}${DESTDIR}/fluho.user" && \
   rm -vf "${ROOTDIR}${DESTDIR}/fluho-ctr" && \
   rm -vf "${ROOTDIR}${DESTDIR}/fluho-mdl" && \
   rm -vf "${ROOTDIR}${DESTDIR}/fluho-mdl-git" && \
+  rm -vf "${ROOTDIR}${DESTDIR}/tools-bash.0.6.0" && \
   
-  sed -i "\%^PATH=${DESTDIR}:.*%d" "${ROOTDIR}/etc/environment" && \
+  rm -vf "${ROOTDIR}/etc/profile.d/${APPNAME}.sh" && \
   rmdir -v --ignore-fail-on-non-empty "${ROOTDIR}${DESTDIR}/" && \
   echo "Success" || echo "Error"
 }
