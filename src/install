@@ -97,19 +97,27 @@ do_uninstall()
 
   if [ "$DESTDIR" == "" ]; then
     whichpath="`which fluho`"
+  fi
+
+  if [ "$whichpath" != "" ]; then
+    DESTDIR="$whichpath"
   else
     DESTDIR="$DESTDIR_DFL"
   fi
   
-  rm -f "${ROOTDIR}${DESTDIR}/fluho" && \
-  rm -f "${ROOTDIR}${DESTDIR}/fluho.user" && \
-  rm -f "${ROOTDIR}${DESTDIR}/fluho-ctr" && \
-  rm -f "${ROOTDIR}${DESTDIR}/fluho-mdl" && \
-  rm -f "${ROOTDIR}${DESTDIR}/fluho-mdl-git" && \
+  echo "Uninstalling fluho at ${ROOTDIR}${DESTDIR}"
+
+  rm -vf "${ROOTDIR}${DESTDIR}/fluho" && \
+  rm -vf "${ROOTDIR}${DESTDIR}/fluho.user" && \
+  rm -vf "${ROOTDIR}${DESTDIR}/fluho-ctr" && \
+  rm -vf "${ROOTDIR}${DESTDIR}/fluho-mdl" && \
+  rm -vf "${ROOTDIR}${DESTDIR}/fluho-mdl-git" && \
   
   sed -i "\%^PATH=${DESTDIR}:.*%d" "${ROOTDIR}/etc/environment" && \
+  rmdir -v --ignore-fail-on-non-empty "${ROOTDIR}${DESTDIR}/" && \
   echo "Success" || echo "Error"
 }
+
 
 
 
