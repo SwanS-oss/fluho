@@ -82,7 +82,7 @@ do_install()
   install -v --mode=664 fluho-mdl      "${ROOTDIR}${DESTDIR}" && \
   install -v --mode=664 fluho-mdl-git  "${ROOTDIR}${DESTDIR}" && \
 
-  sed -i '%^PATH=${DESTDIR}:.*%d' "${ROOTDIR}/etc/environment" && \
+  sed -i "\%^PATH=${DESTDIR}:.*%d" "${ROOTDIR}/etc/environment" && \
   echo "PATH=${DESTDIR}:${PATH}" >> "${ROOTDIR}/etc/environment" && \
   echo "Success" || echo "Error"
 }
@@ -101,13 +101,14 @@ do_uninstall()
     DESTDIR="$DESTDIR_DFL"
   fi
   
-  rm -f "${ROOTDIR}${DESTDIR}/fluho"
-  rm -f "${ROOTDIR}${DESTDIR}/fluho.user"
-  rm -f "${ROOTDIR}${DESTDIR}/fluho-ctr"
-  rm -f "${ROOTDIR}${DESTDIR}/fluho-mdl"
-  rm -f "${ROOTDIR}${DESTDIR}/fluho-mdl-git"
+  rm -f "${ROOTDIR}${DESTDIR}/fluho" && \
+  rm -f "${ROOTDIR}${DESTDIR}/fluho.user" && \
+  rm -f "${ROOTDIR}${DESTDIR}/fluho-ctr" && \
+  rm -f "${ROOTDIR}${DESTDIR}/fluho-mdl" && \
+  rm -f "${ROOTDIR}${DESTDIR}/fluho-mdl-git" && \
   
-  sed -i '%^PATH=${DESTDIR}:.*%d' "${ROOTDIR}/etc/environment"
+  sed -i "\%^PATH=${DESTDIR}:.*%d" "${ROOTDIR}/etc/environment" && \
+  echo "Success" || echo "Error"
 }
 
 
