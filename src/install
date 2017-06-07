@@ -74,14 +74,17 @@ do_install()
   DESTDIR="${DESTDIR:-$DESTDIR_DFL}"
   
   [ "$ROOTDIR" != "" ] && ROOTDIR="${ROOTDIR}/"  # Get sure ROOTDIR ends with /
+  
+  mkdir -p "${ROOTDIR}${DESTDIR}" && \
+  install -v --mode=774 fluho          "${ROOTDIR}${DESTDIR}" && \
+  install -v --mode=664 fluho.user     "${ROOTDIR}${DESTDIR}" && \
+  install -v --mode=664 fluho-ctr      "${ROOTDIR}${DESTDIR}" && \
+  install -v --mode=664 fluho-mdl      "${ROOTDIR}${DESTDIR}" && \
+  install -v --mode=664 fluho-mdl-git  "${ROOTDIR}${DESTDIR}" && \
 
-  install --mode=774 fluho          "${ROOTDIR}${DESTDIR}"
-  install --mode=664 fluho.user     "${ROOTDIR}${DESTDIR}"
-  install --mode=664 fluho-ctr      "${ROOTDIR}${DESTDIR}"
-  install --mode=664 fluho-mdl      "${ROOTDIR}${DESTDIR}"
-  install --mode=664 fluho-mdl-git  "${ROOTDIR}${DESTDIR}"
-
-  echo "PATH=${DESTDIR}:${PATH}" >> "${ROOTDIR}/etc/environment"
+  sed -i '%^PATH=${DESTDIR}:.*%d' "${ROOTDIR}/etc/environment" && \
+  echo "PATH=${DESTDIR}:${PATH}" >> "${ROOTDIR}/etc/environment" && \
+  echo "Success" || echo "Error"
 }
 
 
