@@ -325,12 +325,6 @@ main()
     exit 1
   fi
 
-  if ! vcs_is_inside_work_tree; then
-    echoerr "\
-Not under a version control system"
-    exit 1
-  fi
-  
   args=`getopt -o : --long \
   feature:,format:,init,latest,noremote,purpose:,remote:,version,help -- "$@"`
   if [ $? -ne 0 ]; then
@@ -378,6 +372,12 @@ Not under a version control system"
     shift
   done
 
+  if ! vcs_is_inside_work_tree; then
+    echoerr "\
+Not under a version control system"
+    exit 1
+  fi
+  
   if [ "$USE_REMOTE" == true ] && ! vcs_is_remote_configured; then
     echowarn "\
 Remote repository '$REMOTE_ALIAS' not configured. Now working locally.
