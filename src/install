@@ -106,6 +106,7 @@ askYes() {
 
 do_install()
 {
+  local success=false
   ROOTDIR="${ROOTDIR:-$ROOTDIR_DFL}"
   DESTDIR="${DESTDIR:-$DESTDIR_DFL}"
   
@@ -126,18 +127,30 @@ do_install()
   install -v --mode=664   fluho-mdl          "${ROOTDIR}${DESTDIR}" && \
   install -v --mode=664   fluho-mdl-git      "${ROOTDIR}${DESTDIR}" && \
   install -v --mode=664   tools-bash.0.6.0   "${ROOTDIR}${DESTDIR}" && \
-
   echo "PATH=${DESTDIR}:\$PATH" > "${ROOTDIR}/etc/profile.d/${APPNAME}.sh" && \
-  echo "\
+  success=true
+
+  # Workaround for Bash subsystem in Windows not loading profile.d scripts
+  if [ "$success" == true -a "$ROOTDIR" == "" ] && \
+    grep -q Microsoft /proc/version
+  then
+    echo "Bash for Windows detected: modifying PATH for user..."
+    echo "PATH=${DESTDIR}:\$PATH" >> "${HOME}/.bashrc" \
+    && success=true || success=false
+  fi
+
+  [ "$success" == true ] && echo "\
 Success
 
-Log-out and log-in in the terminal to use '$APPNAME' from any location." || \
-echo "Error"
+Log-out and log-in in the terminal to use '$APPNAME' from any location." \
+  || echo "Error"
 }
 
 
 do_uninstall()
 {
+  local success=false
+  
   ROOTDIR="${ROOTDIR:-$ROOTDIR_DFL}"
 
   [ "$ROOTDIR" != "" ] && ROOTDIR="${ROOTDIR}/"  # Get sure ROOTDIR ends with /
@@ -169,7 +182,18 @@ do_uninstall()
   
   rm -vf "${ROOTDIR}/etc/profile.d/${APPNAME}.sh" && \
   rmdir -v --ignore-fail-on-non-empty "${ROOTDIR}${DESTDIR}/" && \
-  echo "Success" || echo "Error"
+  success=true
+  
+  # Workaround for Bash subsystem in Windows not loading profile.d scripts
+  if [ "$success" == true -a "$ROOTDIR" == "" ] && \
+    grep -q Microsoft /proc/version
+  then
+    echo "Bash for Windows detected: modifying PATH for user..."
+    sed -i "\%^PATH=${DESTDIR}:.*%d" "${HOME}/.bashrc" \
+    && success=true || success=false
+  fi
+
+  [ "$success" == true ] && echo "Success" || echo "Error"
 }
 
 
