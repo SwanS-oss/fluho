@@ -127,7 +127,7 @@ do_install()
   install -v --mode=664   fluho-mdl-git      "${ROOTDIR}${DESTDIR}" && \
   install -v --mode=664   tools-bash.0.6.0   "${ROOTDIR}${DESTDIR}" && \
 
-  echo "PATH=${DESTDIR}:${PATH}" > "${ROOTDIR}/etc/profile.d/${APPNAME}.sh" && \
+  echo "PATH=${DESTDIR}:\$PATH" > "${ROOTDIR}/etc/profile.d/${APPNAME}.sh" && \
   echo "\
 Success
 
