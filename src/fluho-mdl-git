@@ -90,10 +90,11 @@ vcs_create_lightweighttag ()
 
 vcs_exist_localbranch ()
 {
-  # Return 0 if the branch exists in the current repository
+  # Return 0 if the branch exists in the current local repository
   #   branch_pattern = Branch name, literal or fnmatch pattern (glob?)
 
   local branch_pattern=$1
+  
   [ "`git for-each-ref --format='%(refname)' "refs/heads/$branch_pattern" \
     2>/dev/null #do`" != "" ]
 }
@@ -162,6 +163,51 @@ vcs_merge_branch_ff ()
       git push "${REMOTE_ALIAS}" "${dstBranch}:${dstBranch}" 2>/dev/null \
       && success=true
     fi
+  fi
+  
+  [ "$success" == true ] && return 0 || return 1
+}
+
+
+vcs_merge_branch_noff ()
+{
+  local srcBranch=$1
+  local dstBranch=$2
+  
+  local currentBranch=`vcs_get_currentbranch`
+  local success=false
+    
+  if [ "$dstBranch" == "" ] || [ "$dstBranch" == "$currentBranch" ]; then
+    git merge "$srcBranch" 2>/dev/null && success=true
+    if [[ "$success" == true && "$USE_REMOTE" == true ]]; then
+      success=false
+      git push "$REMOTE_ALIAS" "$currentBranch" 2>/dev/null && success=true
+    fi
+  else
+    git fetch . "${srcBranch}:${dstBranch}" && success=true
+    if [[ "$success" == true && "$USE_REMOTE" == true ]]; then
+      success=false
+      git push "${REMOTE_ALIAS}" "+${dstBranch}:${dstBranch}" 2>/dev/null \
+      && success=true
+    fi
+  fi
+  
+  [ "$success" == true ] && return 0 || return 1
+}
+
+
+vcs_remove_branch ()
+{
+  # Remove a branch both locally and remotely
+  
+  local branch="$1"
+  
+  local success=false
+  
+  git branch -d "$branch" && success=true
+  if [[ "$success" == true && "$USE_REMOTE" == true ]]; then
+    success=false
+    git push "$REMOTE_ALIAS" --delete "$branch" && success=true
   fi
   
   [ "$success" == true ] && return 0 || return 1
