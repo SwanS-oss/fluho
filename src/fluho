@@ -14,7 +14,7 @@
 
 
 
-VERSION="1.0-alpha"
+VERSION="1.0.16-alpha"
 
 ENABLE_DBG=false
 
@@ -75,6 +75,8 @@ Actions:
       --format (base|alternative). Default: base
       --latest
         Show only the latest version that matches the given 'version_number'.
+      --nofeatures
+        Do not show the existing features under development for each version.
       --purpose {development|testing|production}
         Limit the list to versions for development, testing or production. 
   status
@@ -102,11 +104,12 @@ Actions:
     state, or the test branch to the production branch for stable state, 
     create tags for the version and execute the extra actions for releasing. 
     {version_number}
-      Format: [v]{major}.{minor}.{revision}-{status}
+      Format: [v]{major}.{minor}[.{revision}-{status}]
     [options]
       --feature {feature_name}
         Finish feature development and merge the feature code to the version.
-        It does not release the version itself."
+        It does not release the version itself.
+        {revision} and {status} do not have to be specified."
   [ "$USE_REMOTE" == true ] && echo "\
   sync
     Synchronize local versions with remote repository"
@@ -208,6 +211,43 @@ Not version released for $purpose yet."
 }
 
 
+show_releaseversion_suggestion()
+{
+  vmajor=$(get_currentvmajor); vmajor=${vmajor:-0}
+  vminor=$(get_currentvminor); vminor=${vminor:-0}
+  currentpurpose=$(get_currentpurpose)
+  currentpurpose=${currentpurpose:-general}
+  case "$currentpurpose" in
+    development ) 
+      latestvstatus=$(get_latestvstatus "$vmajor" "$vminor" "testing")
+      nextvrev=$(get_nextvrev "$vmajor" "$vminor")
+      ;;
+    * )
+      latestvstatus=$(get_latestvstatus "$vmajor" "$vminor" "general")
+      nextvrev=$(get_currentvrev); nextvrev=${nextvrev:-0}
+  esac
+  latestvstatus=${latestvstatus:-alpha}
+  echoerr "\
+Specify version to release. For example:
+
+    $ ${0##*/} release v${vmajor}.${vminor}.${nextvrev}-$latestvstatus"
+
+}
+
+
+show_releasefeature_suggestion()
+{
+  local vmajor="${1:-"{major}"}"
+  local vminor="${2:-"{minor}"}"
+  local feature_name="${3:-"{feature_name}"}"
+
+  echoerr "\
+Specify version number as major.minor and the feature name to be released.
+Use a command like this:
+
+  $ ${0##*/} release v${vmajor}.${vminor} --feature ${feature_name}"
+
+}
 
 
 validate_version()
@@ -315,6 +355,7 @@ main()
   # Grab options
 
   OPTFEATURE=false
+  OPTNOFEATURES=false
   OPTFORMAT="base"  # base=base  alternative=alt
   OPTINIT=false
   OPTLATEST=false
@@ -326,7 +367,7 @@ main()
   fi
 
   args=`getopt -o : --long \
-  feature:,format:,init,latest,noremote,purpose:,remote:,version,help -- "$@"`
+  feature:,format:,init,latest,nofeatures,noremote,purpose:,remote:,version,help -- "$@"`
   if [ $? -ne 0 ]; then
     show_option_error
     exit 1
@@ -351,6 +392,8 @@ main()
       --init )          OPTINIT=true
                         ;;
       --latest )        OPTLATEST=true
+                        ;;
+      --nofeatures )    OPTNOFEATURES=true
                         ;;
       --noremote )      USE_REMOTE=false
                         ;;
@@ -400,7 +443,12 @@ To avoid this message, use --noremote argument or set USE_REMOTE config to false
                         show_versionformat_error $version
                         exit 1
                       fi
-                      do_init $version
+#                      if [ "$OPTFEATURE" == true ]; then
+#                        do_init_feature "$version" "$feature_name"
+#                      else
+#                        do_init_version "$version"
+#                      fi
+                      do_init "$version"
                       ;;
       list | ls | version ) shift
                       local version=${1:-.}

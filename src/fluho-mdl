@@ -212,28 +212,92 @@ init_vminor () # (int major, int minor)
 }
 
 
+
+
+exist_feature ()
+{
+  local vmajor="$1"
+  local vminor="$2"
+  local feature="$3"
+  
+  local feature_branch="dev/v${vmajor}.${vminor}f/${feature}"
+  
+  vcs_exist_branch "${feature_branch}"
+}
+
+
 init_feature ()
 {
   # TODO
-  local major=$1
-  local minor=$2
-  local feature=$3
+  local vmajor="$1"
+  local vminor="$2"
+  local feature="$3"
+  
+  local feature_branch="dev/v${vmajor}.${vminor}f/${feature}"
   
   # Se crea la rama dev/v{major}.{minor}/{feature} a partir de la rama dev/v{major}.{minor}  ◄◄◄
-  echo 
+  vcs_create_branch "${feature_branch}" "dev/v${vmajor}.${vminor}"
+}
+
+
+is_infeature ()
+{
+  local vmajor="$1"
+  local vminor="$2"
+  local feature="$3"
+  
+  local feature_branch="dev/v${vmajor}.${vminor}f/${feature}"
+  local currentbranch="`get_currentbranch`"
+  
+  if [[ "$vmajor" == "" && "$vminor" == "" && "$feature" == "" ]]; then
+    # Return 0 if we are in any feature branch, 1 otherwise
+    [[ "$currentbranch" =~ ^dev/v[0-9]+\.[0-9]+f/.*$ ]]
+  else
+    # Return 0 if we are in a specific feature branch, 1 otherwise
+    [ "$currentbranch" == "$feature_branch" ]
+  fi
+}
+
+
+get_currentfeature ()
+{
+  local currentbranch="`get_currentbranch`"
+  
+  if [[ "$currentbranch" =~ ^dev/v[0-9]+\.[0-9]+f/.*$ ]]; then
+    echo "$currentbranch" | sed 's%^dev/v.*/%%'
+  else
+    echo ""
+  fi
+}
+
+
+get_features_forversion ()
+{
+  local version="$1"
+  local vrev="`extract_vrev $version`"
+  
+  if [ "$vrev" == "" ]; then
+    local vmajor="`extract_vmajor $version`"
+    local vminor="`extract_vminor $version`"
+    
+    vcs_get_branches "dev/v${vmajor}\.${vminor}f/*" | sed 's%^dev/v.*/%%g'
+  fi
 }
 
 
 end_feature ()
 {
   # TODO
-  local major=$1
-  local minor=$2
-  local feature=$3
+  local vmajor="$1"
+  local vminor="$2"
+  local feature="$3"
 
+  local feature_branch="dev/v${vmajor}.${vminor}f/${feature}"
+  
   # Se fusiona la rama dev/v{major}.{minor}/{feature} con rama dev/v{major}.{minor} sin fast-forward  ◄◄◄
   # Se elimina la rama dev/v{major}.{minor}/{feature}  ◄◄◄
-  echo 
+  vcs_merge_branch_noff "${feature_branch}" "dev/v${vmajor}.${vminor}" \
+  && vcs_remove_branch "${feature_branch}"
 }
 
 
@@ -369,10 +433,12 @@ get_currentvstatus ()
 
 get_currentversions ()
 {
+  # Current commit can correspond to multiple versions. Returns a list of them.
+  
   local currentpurpose=`get_currentpurpose`
   local currentbranch=`get_currentbranch`
   local currentversion_vmajorminor=`echo $currentbranch | \
-    sed -r 's%^(dev|test)/%%'`
+    sed -r 's%^(dev|test)/%%g; s%^.*(v[0-9]+\.[0-9]+)(f/.*$)%\1%g'`
   
   if [ "$currentpurpose" == "development" ]; then
     # Discard branches not corresponding to version and echo version number
@@ -391,7 +457,7 @@ get_currentversion ()
   local currentpurpose=`get_currentpurpose`
   local currentbranch=`get_currentbranch`
   local currentversion_vmajorminor=`echo $currentbranch | \
-    sed -r 's%^(dev|test)/%%'`
+    sed -r 's%^(dev|test)/%%; s%^.*(v[0-9]+\.[0-9]+)(f/.*$)%\1%'`
   
   if [ "$currentpurpose" == "development" ]; then
     # Discard branches not corresponding to version and echo version number
@@ -708,11 +774,61 @@ get_nextvstatusrev ()
 
 
 
+is_inversion ()
+{
+  #TODO To be completed. Currently only works te check if in any version
+  local purpose="$1"
+  local vmajor="$2"
+  local vminor="$3"
+  local vrev="$4"
+  local vstatus="$5"
+
+  local currentbranch="`get_currentbranch`"
+  local expected_branch
+  
+  case $purpose in
+    general )
+      ;;
+
+    development ) 
+      expected_branch="dev/v${vmajor}.${vminor}/${feature}"
+      ;;
+
+    testing ) 
+      ;;
+
+    production ) 
+      ;;
+
+    * )
+      echoerr "\
+internal: is_inversion() ${vmajor}.${vminor}.${vrev},purpose:$purpose"
+      exit 1
+      ;;
+  esac
+
+
+
+  if [[ "$vmajor" == "" && "$vminor" == "" && "$vrev" == "" \
+    && "$vstatus" == "" ]]
+    then
+    # Return 0 if we are in any feature branch, 1 otherwise
+    [[ "$currentbranch" =~ ^(dev/v|test/v|v)[0-9]+$ ]]
+  else
+    # Return 0 if we are in a specific feature branch, 1 otherwise
+    [ "$currentbranch" == "$expected_branch" ]
+  fi
+}
+
+
 is_pastvstatus ()
 {
+  # Check whether the given status is previous to the latest existing status
+  
   local vmajor=$1
   local vminor=$2
   local vstatus=$3
+  
   local latestvstatus=`get_latestvstatus "$vmajor" "$vminor"`
   
   case $vstatus in
@@ -747,8 +863,6 @@ is_pastvstatus ()
       ;;
   esac
 }
-
-
 
 
 is_headinvmajor ()

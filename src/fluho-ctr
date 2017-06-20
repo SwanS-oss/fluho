@@ -14,12 +14,12 @@
 
 do_init()
 {
+  local version=${1:-"."}
+  
   echodbg "usa init\n"
   echodbg "version: $version\n"
-  echodbg "feature: $OPTFEATURE\n"  # TODO
-  echodbg "feature name: $feature_name\n"  # TODO
-  
-  local version=$1
+  echodbg "feature: $OPTFEATURE\n"
+  echodbg "feature name: $feature_name\n"
   
   local vmajor=`extract_vmajor $version`
   local vminor=`extract_vminor $version`
@@ -28,8 +28,18 @@ do_init()
   
   local success=false
   
-  if [ "$OPTFEATURE" == true ]; then
-    echo "'feature' option still as ToDo."
+  if [[ "$OPTFEATURE" == true && "$vmajor" == "" && "$vminor" == "" ]]; then
+    # Check that version number is specified for FEATURE initialization
+    # Note: For version initialization, it defaults to 0.0 if not specified
+    vmajor="`get_currentversion | extract_vmajor`"; vmajor="${vmajor:-"{major}"}"
+    vminor="`get_currentversion | extract_vminor`"; vminor="${vminor:-"{minor}"}"
+    feature_name="${feature_name:-"{feature_name}"}"
+
+    echoerr "\
+Version number must be specified as major.minor to initialize a feature
+To initialize development of a feature of a version, use a command like this:
+
+    $ ${0##*/} init v${vmajor}.${vminor} --feature ${feature_name}"
     exit 1
   fi
   
@@ -43,7 +53,10 @@ Only major.minor version can be initialized. Use:
     $ ${0##*/} init ${vmajor}.${vminor}"
     exit 1
   fi
+  
+  # New major version init
   if ! exist_vmajor "$vmajor" development; then
+    # Check the v0.0 is used if fluho not initialized
     if [ $vmajor -ne 0 -o $vminor -ne 0 ] && ! is_initialized; then
       show_notinitialized_error
       exit 1  
@@ -53,7 +66,7 @@ Only major.minor version can be initialized. Use:
 Are you sure you want to init the version ${vmajor}.${vminor}" "No"
     then 
       echo "\
-Canceled!"
+Version initialization canceled!"
       exit 2
     fi
       
@@ -88,12 +101,13 @@ Cannot be successfully initialized because a failure creating tags"
     echo "\
 v${vmajor}.${vminor} initialized"
 
+  # New minor of existing major init
   elif ! exist_vminor "$vmajor" "$vminor" development; then
     if ! askYes "\
 Are you sure you want to init the version ${vmajor}.${vminor}" "No"
     then 
       echo "\
-Canceled!"
+Version initialization canceled!"
       exit 2
     fi
       
@@ -111,11 +125,42 @@ Cannot be successfully initialized because a failure creating branches"
     echo "\
 v${vmajor}.${vminor} initialized"
 
-  else
+  elif [ "$OPTFEATURE" != true ]; then
     echoerr "\
 v${vmajor}.${vminor} already exists"
     exit 1
   fi
+  
+  # New feature init
+  if [ "$OPTFEATURE" == true ]; then
+    success=false
+    
+    if exist_feature "$vmajor" "$vminor" "$feature_name"; then
+      echoerr "\
+Feature '${feature_name}' for version ${vmajor}.${vminor} already exists"
+      exit 1
+    fi
+    
+    if ! askYes "\
+Init the feature '${feature_name}' for version ${vmajor}.${vminor}" "No"
+    then 
+      echo "\
+Feature initialization canceled!"
+      exit 2
+    fi
+    
+    init_feature "$vmajor" "$vminor" "$feature_name" && success=true
+    
+    if [ "$success" == true ]; then 
+      echo "\
+Created branches"
+    else
+      echoerr "\
+Cannot be successfully initialized because a failure creating branches"
+      exit 1
+    fi
+  fi
+
 }
 
 
@@ -126,7 +171,7 @@ do_list()
   echodbg "usa ls\n"
   echodbg "version: $version\n"
   echodbg "format: $OPTFORMAT\n"
-  echodbg "feature: $feature_name\n"  # TODO
+  echodbg "nofeatures: $OPTNOFEATURES\n"
   echodbg "purpose: $OPTPURPOSE\n"
   echodbg "latest: $OPTLATEST\n"
   
@@ -136,22 +181,47 @@ do_list()
   local vstatus=`extract_vstatus $version`
   
   local currentversions="`get_currentversions`"
+  local currentfeature="`get_currentfeature`"
   
   local versions="`get_versions "$OPTPURPOSE" "$vmajor" "$vminor" "$vrev" \
     "$vstatus" | sort --version-sort`"
+    
+  local one_version
+  local features_forversion
+  local one_feature
   
   if [ "$OPTLATEST" == true ]; then
     versions="`echo "$versions" | tail -n 1`"
   fi
 
- [ "$versions" != "" ] && echo "$versions" \
-  | while IFS='' read -r one_version || [[ -n "$one_version" ]]; do
-    if [ "`echo "$currentversions" | grep "^${one_version}$"`" == "" ]; then
-      echo "  $one_version"
-    else
-      echo "* $one_version"
-    fi
-  done
+  if [ "$versions" != "" ]; then
+    echo "$versions" | \
+    while IFS='' read -r one_version || [[ -n "$one_version" ]]; do
+  
+      if [ "`echo "$currentversions" | grep "^${one_version}$"`" == "" ]; then
+        echo "  $one_version"
+      else
+        echo "* $one_version"
+      fi
+    
+      # List features for each development version
+      [ "$OPTNOFEATURES" != true ] \
+      && features_forversion="`get_features_forversion "$one_version"`"
+      if [ "$features_forversion" != "" ]; then
+        echo "$features_forversion" | \
+        while IFS='' read -r one_feature || [[ -n "$one_feature" ]]; do
+      
+          if [ "`echo "$currentfeature" | grep "^${one_feature}$"`" == "" ]
+          then
+            echo "    $one_feature"
+          else
+            echo "  * $one_feature"
+          fi
+        done
+      fi
+
+    done
+  fi
   
   
 
@@ -181,7 +251,7 @@ do_list()
 
 do_status()
 {
-  local currentpurpose=`get_currentpurpose`
+  local currentpurpose="`get_currentpurpose`"
   local stage_txt
   local vtype_txt
   local latestvrev_txt
@@ -214,6 +284,10 @@ Not in a version"
   local vminor="`extract_vminor $currentversion`"
  
   output="${output}, on version $currentversion"
+  
+  if is_infeature; then
+    output="${output}, on feature '`get_currentfeature`'"
+  fi
   
   echo "$output"
   
@@ -259,14 +333,9 @@ do_checkout()
 
   echodbg "version: $version\n"
   echodbg "feature: $OPTFEATURE\n"
-  echodbg "feature name: $feature_name\n"  # TODO
+  echodbg "feature name: $feature_name\n"
   echodbg "init: $OPTINIT\n"
   echodbg "purpose: $OPTPURPOSE\n"
-  
-  if [ "$OPTFEATURE" == true ]; then
-    echo "'feature' option still as ToDo."
-    exit 1
-  fi
   
   vmajor=`extract_vmajor $version`
   vminor=`extract_vminor $version`
@@ -274,7 +343,9 @@ do_checkout()
   vstatus=`extract_vstatus $version`
       
   case "$OPTPURPOSE" in
+    
     development )
+      
       if [ "$vmajor" == "" ] || [ "$vminor" == "" ]; then
         
         # There was empty needed field
@@ -290,11 +361,14 @@ Version not completely specified as {major}.{minor}"
           echoerr "\
 Development version can only be specified as {major}.{minor}
 To checkout a version for testing or production, use a command like this:
-$ ${0##*/} checkout v{major}.{minor}.{rev}-(alpha|beta|rc)
+
+    $ ${0##*/} checkout v{major}.{minor}.{rev}-(alpha|beta|rc)
 or
-$ ${0##*/} checkout v{major}.{minor}.{rev}-stable"
+
+    $ ${0##*/} checkout v{major}.{minor}.{rev}-stable"
           exit 1
         fi
+        
         if ! exist_version "$OPTPURPOSE" "${vmajor}" "${vminor}"; then
           echoerr "\
 v${vmajor}.${vminor} did not match any existing version for development.
@@ -303,15 +377,40 @@ To checkout and initialize it as a new version, use:
     $ ${0##*/} checkout v${vmajor}.${vminor} --init"
           exit 1
         else
-          echo "\
+          if [ "$OPTFEATURE" == true ]; then
+          
+            # Checking out to FEATURE
+            if ! exist_feature "$vmajor" "$vminor" "$feature_name"; then
+              echoerr "\
+Feature \'${feature_name}\' for version ${vmajor}.${vminor} does not exists
+To checkout and initialize it as a new feature, use:
+
+    $ ${0##*/} checkout v${vmajor}.$vminor --feature \"${feature_name}\" --init"
+              exit 1
+            fi
+            echo "\
+Checking out to branch 'dev/v${vmajor}.${vminor}f/${feature_name}'"
+            vcs_checkout "dev/v${vmajor}.${vminor}f/${feature_name}"
+          else
+          
+            # Checking out to Development VERSION
+            echo "\
 Checking out to branch 'dev/v${vmajor}.${vminor}'"
-          vcs_checkout "dev/v${vmajor}.${vminor}"
+            vcs_checkout "dev/v${vmajor}.${vminor}"
+          fi
         fi
         
       fi
       ;;
     
     testing )
+      
+      if [ "$OPTFEATURE" == true ]; then
+        echoerr "\
+Feature development can only be performed over development versions"
+        exit 1
+      fi
+
       if [ "$vmajor" == "" ] || [ "$vminor" == "" ] || [ "$vrev" == "" ] || \
         [ "$vstatus" == "" ]; then
         
@@ -342,6 +441,12 @@ Checking out to the version: v${vmajor}.${vminor}.${vrev}-${vstatus}"
       ;;
       
     production )
+      
+      if [ "$OPTFEATURE" == true ]; then
+        echoerr "\
+Feature development can only be performed over development versions"
+        exit 1
+      fi
     
       if [[ "$vmajor" == "" || "$vminor" == "" || "$vrev" == "" || \
         ( "$vstatus" != "" && "$vstatus" != "stable" ) ]]; then
@@ -404,44 +509,66 @@ do_release()
   local version=${1:-"."}
 
   echodbg "usa release\n"
-  echodbg "feature: $OPTFEATURE\n"  # TODO
-  echodbg "feature name: $feature_name\n"  # TODO
+  echodbg "feature: $OPTFEATURE\n"
+  echodbg "feature name: $feature_name\n"
 
   local vmajor="`extract_vmajor $version`"
   local vminor="`extract_vminor $version`"
   local vrev="`extract_vrev $version`"
   local vstatus="`extract_vstatus $version`"
 
+  local success=false
   local nextvrev
   local currentpurpose
   local latestvstatus
   
   if [ "$OPTFEATURE" == true ]; then
-    echo "'feature' option still as ToDo."
-    exit 1
+    if [[ "$vmajor" == "" || "$vminor" == "" ]]; then
+      show_releasefeature_suggestion "" "" ""
+      exit 1
+    elif [ "$feature_name" == "" ]; then
+      show_releasefeature_suggestion "$vmajor" "$vminor" ""
+      exit 1
+    elif [[ "$vrev" != "" || "$vstatus" != "" ]]; then
+      show_releasefeature_suggestion "$vmajor" "$vminor" "$feature_name"
+      exit 1
+    elif ! exist_feature "$vmajor" "$vminor" "$feature_name"; then
+      echoerr "\
+The feature '$feature_name' does not exist for version ${vmajor}.${vminor}"
+      exit 1
+    else
+    
+      if ! askYes "\
+End development of feature '${feature_name}' for version ${vmajor}.${vminor}?
+Note: this will merge the feature branch into the version development branch and
+delete the feature branch" "No"
+      then 
+        echo "\
+Feature releasing canceled!"
+        exit 2
+      fi
+      
+      end_feature "$vmajor" "$vminor" "$feature_name" && success=true
+      
+      if [ "$success" == true ]; then 
+        echo "\
+Feature branch merged and deleted"
+      else
+        echoerr "\
+Cannot be successfully released because a failure merging or removing branch"
+        exit 1
+      fi
+      
+    fi
+    
+    exit 0
   fi
+  
   
   if [ "$vmajor" == "" ] || [ "$vminor" == "" ] || [ "$vrev" == "" ] || \
     [ "$vstatus" == "" ]; then
     # Show error and suggestion
-    vmajor=$(get_currentvmajor); vmajor=${vmajor:-0}
-    vminor=$(get_currentvminor); vminor=${vminor:-0}
-    currentpurpose=$(get_currentpurpose)
-    currentpurpose=${currentpurpose:-general}
-    case "$currentpurpose" in
-      development ) 
-        latestvstatus=$(get_latestvstatus "$vmajor" "$vminor" "testing")
-        nextvrev=$(get_nextvrev "$vmajor" "$vminor")
-        ;;
-      * )
-        latestvstatus=$(get_latestvstatus "$vmajor" "$vminor" "general")
-        nextvrev=$(get_currentvrev); nextvrev=${nextvrev:-0}
-    esac
-    latestvstatus=${latestvstatus:-alpha}
-    echoerr "\
-Specify version to release. For example:
-
-    $ ${0##*/} release v${vmajor}.${vminor}.${nextvrev}-$latestvstatus"
+    show_releaseversion_suggestion
     exit 1
   fi
       
