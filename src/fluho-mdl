@@ -234,9 +234,10 @@ init_feature ()
   local feature="$3"
   
   local feature_branch="dev/v${vmajor}.${vminor}f/${feature}"
+  local base_branch="dev/v${vmajor}.${vminor}"
   
   # Se crea la rama dev/v{major}.{minor}/{feature} a partir de la rama dev/v{major}.{minor}  ◄◄◄
-  vcs_create_branch "${feature_branch}" "dev/v${vmajor}.${vminor}"
+  vcs_create_branch "${feature_branch}" "${base_branch}"
 }
 
 
