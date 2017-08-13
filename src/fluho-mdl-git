@@ -29,7 +29,7 @@ vcs_checkout ()
   if [ "$1" != "" ]; then echo "$1" | $FUNCNAME; else
     local commit=`cat`
     
-    git checkout $commit
+    git -c advice.detachedHead=false checkout $commit
   fi
 }
 
