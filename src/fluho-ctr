@@ -267,13 +267,13 @@ do_status()
   
   case "$currentpurpose" in
     development )
-      output="Developing"
+      output="DEVELOPING"
       ;;
     testing )
-      output="Testing"
+      output="TESTING"
       ;;
     production )
-      output="Production"
+      output="PRODUCTION"
       ;;
     * )
       echo "\
@@ -286,10 +286,10 @@ Not in a version"
   local vmajor="`extract_vmajor $currentversion`"
   local vminor="`extract_vminor $currentversion`"
  
-  output="${output}, on version $currentversion"
+  output="${output} on VERSION $currentversion"
   
   if is_infeature; then
-    output="${output}, on feature '`get_currentfeature`'"
+    output="${output}, on FEATURE '`get_currentfeature`'"
   fi
   
   echo "$output"
@@ -338,11 +338,18 @@ Not in a version"
   output=""
   
   if vcs_exist_uncommittedchanges; then
-    output="There are uncommited changes "
+    output="There are uncommitted changes"
+    if [ "$currentpurpose" != "development" ]; then
+      output="$output (DO NOT COMMIT THEM!! YOU ARE NOT IN DEVELOPMENT VERSION)"
+    fi
   fi
   
   if vcs_is_branchahead; then
-    output="${output}There are unreleased commits"
+    if [ "$output" != "" ]; then
+      output="${output} and unreleased commits"
+    else
+      output="There are unreleased commits"
+    fi
   fi
   
   echo $output

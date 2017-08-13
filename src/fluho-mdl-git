@@ -313,7 +313,12 @@ vcs_get_currentcheckout ()
 
 vcs_exist_uncommittedchanges ()
 {
-  u="$(git ls-files --others)" && test ! -z "$u"
+  if ! git diff-index --quiet HEAD -- || [ "`git ls-files --others`" != "" ]
+  then
+    return 0
+  else
+    return 1
+  fi
   # RETURN 0 if there are uncommitted changes, 1 if not
 }
 
