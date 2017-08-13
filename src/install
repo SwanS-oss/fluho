@@ -4,56 +4,57 @@
 # Fluho
 # Installer
 #
-# Written by Juan Jose Castro Sotelo
+# Using Simple_Installer_Template v1.0.0 by Juan Jose Castro Sotelo
 # Licensed under terms of GPLv3
 #
 ###############################################################################
 
 
 
+# ====== INCLUDES ======
 
-APPNAME="fluho"
-
-DESTDIR_DFL="/opt/$APPNAME"  # Application installation dir inside rootfs
-ROOTDIR_DFL=""  # Rootfs path (for deb building, jails). Empty is equal to /
-
+. install.config  # Modify this file to customize the installer for an app
+. tools-bash.0.7.0
 
 
 
-exitIfNotRoot() {
-  if [ $EUID -ne 0 ]; then
-     echo "\
-This script must be run as root or with sudo.
-
-Example: 
-
-    $ sudo ${0##*/}" 1>&2
-     exit 1
-  fi
-}
-
-
-show_usage()
-{
-  echo "\
-Usage: ${0##*/} <options>"
-}
-
+# ====== VIEW FUNCTIONS ======
 
 show_help()
 {
   echo "\
+Usage: ${0##*/} <options>
+
 Install the application '$APPNAME' in the operating system.
 [options]
-  -d, --destdir DIR
+  -d, --instdir DIR
     Target directory where the application will be installed
-    Default: $DESTDIR_DFL
-  -r, --root DIR
+    Default: $INSTDIR_DFL
+  -r, --rootdir DIR
     Set the root path of the operating system file system.
-    For example, /etc/environment will be searched in {DIR}/etc/environment
+    Useful for .deb building, jails, etc. For example, /etc/environment will be 
+    searched in {DIR}/etc/environment
     Default: ${ROOTDIR_DFL:-/}
+  -b, --bindir DIR
+    System binaries directory
+    Only useful if executable files are going to be installed.
+    Default: $BINDIR_DFL
+  -b, --libdir DIR
+    System libraries directory
+    Only useful if libraries are going to be installed.
+    Default: $LIBDIR_DFL
+  -b, --kmoddir DIR
+    System kernel modules directory
+    Only useful if kernel modules are going to be installed.
+    Default: $KMODDIR_DFL
+  -b, --krelease DIR
+    Kernel release name. For example, the same than obtained with \`uname -r\`
+    Only useful if kernel modules are going to be installed.
+    Default: $KRELEASE_DFL
   -u, --uninstall
     Uninstall the application from the operating system.
+  -a, --unattended
+    Do not prompt to the user for anything. Use always default answer.
   -h, --help
     Show this information"
 }
@@ -68,147 +69,278 @@ Bad action, option or argument. Take a look at:
 }
 
 
-isYes() {
-  echo "$1" | grep -i "^y" &> /dev/null
-  # Note: [ "$1" != "" ] && echo "$1" | $FUNCNAME || \ does not work for empty
-  # input. Tried cat, dd and read and "if then else". Nothing...
-}
 
-
-askYes() {
-  # ARGS IN:
-  local textToShow="$1"
-  local defaultOption="${2:-"y"}"  # "y" or "n"
-  
-  local output="$textToShow"
-  local option="invalid"
-  
-  while [[ ! "$option" =~ (^$|^[NnYy].*$) ]]; do
-    if [[ "$defaultOption" =~ ^[Nn].*$ ]]; then
-      echo -n "${textToShow} [yes/No]? "
-    else
-      echo -n "${textToShow} [Yes/no]? "
-    fi
-    
-    read option
-  done
-  
-  if isYes "${option}" \
-  || [[ ! "$defaultOption" =~ ^[Nn].*$ && "$option" == "" ]]; then 
-    return 0
-  else
-    return 1 
-  fi
-
-}
-
-
+# ====== INSTALLATION/UNINSTALLATION FUNCTIONS ======
 
 do_install()
 {
-  local success=false
+  # DO NOT TOUCH this function to adapt the installer to a new app.
+  # Use install.config instead to customize
+
+  local success=true
+
   ROOTDIR="${ROOTDIR:-$ROOTDIR_DFL}"
-  DESTDIR="${DESTDIR:-$DESTDIR_DFL}"
+  INSTDIR="${INSTDIR:-$INSTDIR_DFL}"
+  BINDIR="${BINDIR:-$BINDIR_DFL}"
+  LIBDIR="${LIBDIR:-$LIBDIR_DFL}"
+  KMODDIR="${KMODDIR:-$KMODDIR_DFL}"
+  KRELEASE="${KRELEASE:-$KRELEASE_DFL}"
   
-  [ "$ROOTDIR" != "" ] && ROOTDIR="${ROOTDIR}/"  # Get sure ROOTDIR ends with /
+  # Get sure ROOTDIR ends with / (note that in POSIX double / is not a problem)
+  [[ "$ROOTDIR" != "" && ! "$ROOTDIR" =~ /$ ]] && ROOTDIR="${ROOTDIR}/"
   
-  if ! askYes "This will install '$APPNAME' in '${ROOTDIR}${DESTDIR}'. Continue"
+  targetdir="`echo "${ROOTDIR}${INSTDIR}" | rmDuplicatedForwardSlashesInPath`"
+
+  if [ "$OPTUNATTENDED" == false ] \
+  && ! askYes "This will install '$APPNAME' in '${targetdir}'. Continue?"
   then
-    echo "Cancelled!"
+    echo "\
+Cancelled!"
     exit 2
   fi
+
+
+  # SPECIFIC APP EXTRA ACTIONS
+  # Write in install.config the code for other needed checkings and preparations
+  CUSTOM_ACTIONS_PREINSTALL
   
-  echo "Installing '${APPNAME}' in ${ROOTDIR}${DESTDIR}..."
+  
+  echo "\
+Installing app '${APPNAME}' in ${targetdir}..."
 
-  mkdir -p "${ROOTDIR}${DESTDIR}" && \
-  install -v --mode=775   fluho              "${ROOTDIR}${DESTDIR}" && \
-  install -v --mode=664   fluho.user         "${ROOTDIR}${DESTDIR}" && \
-  install -v --mode=664   fluho-ctr          "${ROOTDIR}${DESTDIR}" && \
-  install -v --mode=664   fluho-mdl          "${ROOTDIR}${DESTDIR}" && \
-  install -v --mode=664   fluho-mdl-git      "${ROOTDIR}${DESTDIR}" && \
-  install -v --mode=664   tools-bash.0.6.0   "${ROOTDIR}${DESTDIR}" && \
-  echo "PATH=${DESTDIR}:\$PATH" > "${ROOTDIR}/etc/profile.d/${APPNAME}.sh" && \
-  success=true
+  mkdir -p "${targetdir}" \
+  && success=true || success=false
 
-  # Workaround for Bash subsystem in Windows not loading profile.d scripts
-  if [ "$success" == true -a "$ROOTDIR" == "" ] && \
-    grep -q Microsoft /proc/version
-  then
-    echo "Bash for Windows detected: modifying PATH for user..."
-    echo "PATH=${DESTDIR}:\$PATH" >> "${HOME}/.bashrc" \
+  # INSTALLATION OF EVERY FILE IF LIST "FILES_LIST"
+  for ((i=0; i<${#FILES_LIST[*]} && $success == true; i++)) do
+    read filename mode autosymlink symlinks_list < <(local IFS=":"; echo ${FILES_LIST[$i]})
+    
+    # Copying file to the target installation path with defined permissions
+    install -v --mode=$mode "$filename" "${targetdir}" \
     && success=true || success=false
+    
+    # Create automatic symbolic link to file if enabled
+    if [ "$success" == true -a "$autosymlink" == "y" ]; then
+      if [[ $filename =~ \.so$ ]]; then
+        symlink="$LIBDIR/${filename}"
+        #TODO Create a symlink for every version of .so (E.g.: .so.1.2.3)
+      elif [[ $filename =~ \.ko$ ]]; then
+        symlink="${KMODDIR}${KRELEASE}/${filename}"
+      elif [ $(( ($mode / 100) & 2#001 )) == "1" ]; then
+        # File is executable for the owner user
+        symlink="${BINDIR}/${filename}"
+      fi
+      
+      [ "$success" == true ] \
+      && echo "\
+Creating symlink '$symlink' => '${targetdir}/${filename}'..." \
+      && mkdir -p "`dirname "$symlink"`" \
+      && ln -fs "${targetdir}/${filename}" "$symlink" \
+      && success=true || success=false
+    fi
+    
+    # Create custom symbolic links to file if specified in FILES_LIST
+    if [ "$success" == true -a "$symlinks_list" != "" ]; then
+      preIFS=$IFS; IFS=","
+      for symlink in $symlinks_list; do
+        [ "$success" == true ] \
+        && echo "\
+Creating symlink '$symlink' => '${targetdir}/${filename}'..." \
+        && mkdir -p "`dirname "$symlink"`" \
+        && ln -fs "${targetdir}/${filename}" "$symlink" \
+        && success=true || success=false
+      done
+      IFS=$preIFS
+    fi
+  done
+
+  if [ "$success" == false ]; then
+    echo "\
+Error installing files!" >&2
+    exit 1
   fi
+  
+  #addToSystemPath
+  
+  
+  # SPECIFIC APP EXTRA ACTIONS
+  # Write in install.config the code for other needed actions than copying files
+  CUSTOM_ACTIONS_POSTINSTALL
 
-  [ "$success" == true ] && echo "\
-Success
 
-Log-out and log-in in the terminal to use '$APPNAME' from any location." \
-  || echo "Error"
+  # ====== MESSAGE FOR INSTALLATION ENDING ======
+  
+  echo "\
+Success installing '$APPNAME'"
+
+  [ "$ROOTDIR" == "" ] && echo "\
+Log-out and log-in in the terminal to use '$APPNAME' from any location."
 }
 
 
 do_uninstall()
 {
-  local success=false
+  # DO NOT TOUCH this function to adapt the installer to a new app.
+  # Use install.config instead to customize
+
+  local success=true
   
   ROOTDIR="${ROOTDIR:-$ROOTDIR_DFL}"
+  BINDIR="${BINDIR:-$BINDIR_DFL}"
+  LIBDIR="${LIBDIR:-$LIBDIR_DFL}"
+  KMODDIR="${KMODDIR:-$KMODDIR_DFL}"
+  KRELEASE="${KRELEASE:-$KRELEASE_DFL}"
 
-  [ "$ROOTDIR" != "" ] && ROOTDIR="${ROOTDIR}/"  # Get sure ROOTDIR ends with /
+  # Get sure ROOTDIR ends with / (note that in POSIX double / is not a problem)
+  [[ "$ROOTDIR" != "" && ! "$ROOTDIR" =~ /$ ]] && ROOTDIR="${ROOTDIR}/"
+  [ "$ROOTDIR" == "/" ] && ROOTDIR=""
 
-  if [ "$DESTDIR" == "" ]; then
-    whichpath="`which fluho`"
+  # Get the application installation path
+  # Note: Duplicated forward slashes are removed for cosmetic reasons
+  if [ "$INSTDIR" == "" ]; then
+    whichpath="`which ${APPNAME}`"
   fi
 
   if [ "$whichpath" != "" ]; then
-    DESTDIR="$whichpath"
+    INSTDIR="`resolveSymlink "$whichpath" | xargs dirname`"
   else
-    DESTDIR="$DESTDIR_DFL"
+    INSTDIR="$INSTDIR_DFL"
   fi
   
-  if ! askYes "This will remove '$APPNAME' in '${ROOTDIR}${DESTDIR}'. Continue"
+  targetdir="`echo "${ROOTDIR}${INSTDIR}" | rmDuplicatedForwardSlashesInPath`"
+
+  # Checkings prior starting uninstalling
+  if [ ! -d "${targetdir}" ]; then
+    echo "\
+Error: App '$APPNAME' not installed (path: ${targetdir})" >&2
+    exit 1
+  fi
+  
+  if [ "$OPTUNATTENDED" == false ] \
+  && ! askYes "This will uninstall '$APPNAME' in '${targetdir}'. Continue?"
   then
     echo "Cancelled!"
     exit 2
   fi
   
-  echo "Uninstalling '${APPNAME}' in ${ROOTDIR}${DESTDIR}..."
+  
+  # SPECIFIC APP EXTRA ACTIONS
+  # Write in install.config the code for other needed checkings and preparations
+  CUSTOM_ACTIONS_PREUNINSTALL
 
-  rm -vf "${ROOTDIR}${DESTDIR}/fluho" && \
-  rm -vf "${ROOTDIR}${DESTDIR}/fluho.user" && \
-  rm -vf "${ROOTDIR}${DESTDIR}/fluho-ctr" && \
-  rm -vf "${ROOTDIR}${DESTDIR}/fluho-mdl" && \
-  rm -vf "${ROOTDIR}${DESTDIR}/fluho-mdl-git" && \
-  rm -vf "${ROOTDIR}${DESTDIR}/tools-bash.0.6.0" && \
+
+  echo "\
+Uninstalling '${APPNAME}' from '${targetdir}'..."
+
+  # UNINSTALLATION OF EVERY FILE IF LIST "FILES_LIST"
+  for ((i=0; i<${#FILES_LIST[*]} && $success == true; i++)) do
+    read filename mode autosymlink symlinks_list < <(local IFS=":"; echo ${FILES_LIST[$i]})
+    
+    # Remove automatically created symbolic link to file
+    if [ "$success" == true -a "$autosymlink" == "y" ]; then
+      if [[ $filename =~ \.so$ ]]; then
+        symlink="$LIBDIR/${filename}"
+        #TODO Create a symlink for every version of .so (E.g.: .so.1.2.3)
+      elif [[ $filename =~ \.ko$ ]]; then
+        symlink="${KMODDIR}${KRELEASE}/${filename}"
+      elif [ $(( ($mode / 100) & 2#001 )) == "1" ]; then
+        # File is executable for the owner user
+        symlink="${BINDIR}/${filename}"
+      fi
+      
+      [ "$success" == true ] \
+      && echo "\
+Removing symlink '$symlink' => '${targetdir}/${filename}'..." \
+      && rm -vf "$symlink" \
+      && success=true || success=false
+    fi
+    
+    # Remove custom symbolic links to file as specified in FILES_LIST
+    if [ "$success" == true -a "$symlinks_list" != "" ]; then
+      preIFS=$IFS; IFS=","
+      for symlink in $symlinks_list; do
+        [ "$success" == true ] \
+        && echo "\
+Removing symlink '$symlink'=>'${targetdir}/${filename}'..." \
+        && rm -vf "$symlink" \
+        && success=true || success=false
+      done
+      IFS=$preIFS
+    fi
+
+    if [ "$success" == false ]; then
+      echo "\
+Error removing symlink!" >&2
+      exit 1
+    fi
   
-  rm -vf "${ROOTDIR}/etc/profile.d/${APPNAME}.sh" && \
-  rmdir -v --ignore-fail-on-non-empty "${ROOTDIR}${DESTDIR}/" && \
-  success=true
-  
-  # Workaround for Bash subsystem in Windows not loading profile.d scripts
-  if [ "$success" == true -a "$ROOTDIR" == "" ] && \
-    grep -q Microsoft /proc/version
-  then
-    echo "Bash for Windows detected: modifying PATH for user..."
-    sed -i "\%^PATH=${DESTDIR}:.*%d" "${HOME}/.bashrc" \
-    && success=true || success=false
+    # Remove file from installation directory
+    if [ "$success" == true ]; then
+      rm -vf "${targetdir}/${filename}" \
+      && success=true || success=false
+    fi
+    
+    if [ "$success" == false ]; then
+      echo "\
+Error removing file from installation directory!" >&2
+      exit 1
+    fi
+  done
+
+  # Removing application directory
+  if ! isDirEmpty "${targetdir}/"; then
+    if [ "$OPTUNATTENDED" == false ] \
+    && askYes "Directory '${targetdir}' is not empty. Remove it?" n
+    then
+#      echo "\
+#Removing application directory '${targetdir}'..."
+      rm -vR "${targetdir}/" && success=true || success=false
+    fi
+  else
+#    echo "\
+#Removing application directory '${targetdir}'..."
+    rmdir -v "${targetdir}/" && success=true || success=false
   fi
+  
+  if [ "$success" == false ]; then
+    echo "\
+Error removing application directory!" >&2
+    exit 1
+  fi
+  
+  #rmFromSystemPath
+  
 
-  [ "$success" == true ] && echo "Success" || echo "Error"
+  # SPECIFIC APP EXTRA ACTIONS
+  # Write in install.config the code for other needed actions than copying files
+  CUSTOM_ACTIONS_POSTUNINSTALL
+
+
+  # ====== MESSAGE FOR INSTALLATION ENDING ======
+  
+  echo "\
+Success uninstalling '$APPNAME'"
+
 }
 
 
 
-
+# ====== MAIN FUNCTION ======
 
 main()
 {
-  DESTDIR=""
+  INSTDIR=""
   ROOTDIR=""
+  BINDIR=""
+  LIBDIR=""
+  KMODDIR=""
+  KRELEASE=""
   OPTUNINSTALL=false
+  OPTUNATTENDED=false
   
   
-  SHORT_OPTS=":d:r:uh"
-  LONG_OPTS="destdir:,root:,uninstall,help"
+  SHORT_OPTS=":d:r:b:l:m:k:uah"
+  LONG_OPTS="instdir:,root:,bindir:,libdir:,kmoddir:,krelease:,unattended,uninstall,help"
   args=`getopt -o $SHORT_OPTS --long $LONG_OPTS -- "$@"`
   if [ $? -ne 0 ]; then
     show_option_error
@@ -219,14 +351,29 @@ main()
 
   while true ; do
     case "$1" in
-      --destdir | -d )  shift
-                        DESTDIR="$1"
+      --instdir | -d )  shift
+                        INSTDIR="$1"
                         ;;
       --rootdir | -r )  shift
                         ROOTDIR="$1"
                         ;;
+      --bindir | -b )   shift
+                        BINDIR="$1"
+                        ;;
+      --libdir | -l )   shift
+                        LIBDIR="$1"
+                        ;;
+      --kmoddir | -m )  shift
+                        KMODDIR="$1"
+                        ;;
+      --krelease | -k ) shift
+                        KRELEASE="$1"
+                        ;;
       --uninstall | -u ) 
                         OPTUNINSTALL=true
+                        ;;
+      --unattended | -a ) 
+                        OPTUNATTENDED=true
                         ;;
       --help | -h )     show_help; exit 0
                         ;;
@@ -250,3 +397,4 @@ main()
 
 
 main "$@"
+
