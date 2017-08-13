@@ -410,6 +410,26 @@ To checkout and initialize it as a new version, use:
         exit 1
       fi
       
+      if vcs_exist_uncommittedchanges; then
+        echo "\
+There are uncommitted changes.
+
+These changes can cause:
+- Unpredictable behaviour when execute or compile the version you are 
+  checking-out if these files are kept after checking-out.
+- Version control system error or changes overwritting if other version of these
+  files exists in the checked-out version.
+
+Instead of continuing with the checkout, it is recommended to:
+- Stash the files with changes or move them to a temporary directory.
+- Commit the changes.
+"
+        if ! askYes "Do you want to continue with the checkout?" "n"; then
+          echo "Cancelled"
+          exit 2
+        fi
+      fi
+      
       if [ "$OPTFEATURE" == true ]; then
         # Checking out to FEATURE
       
