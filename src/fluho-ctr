@@ -262,6 +262,9 @@ do_status()
     exit 1
   fi
   
+  # First line
+  output=""
+  
   case "$currentpurpose" in
     development )
       output="Developing"
@@ -291,6 +294,9 @@ Not in a version"
   
   echo "$output"
   
+  # Second line
+  output=""
+  
   case "`get_vtype $currentversion`" in
     cuttingedge )
       output="Version type is cutting-edge (head in major and head in minor)"
@@ -305,12 +311,15 @@ Not in a version"
   
   echo "$output"
   
+  # Third line
+  output=""
+  
   local latestvrev="`get_latestvrev "$vmajor" "$vminor" "general"`"
   
   if [[ "$currentpurpose" == "development" ]]
   then
     if [ "$latestvrev" != "" ]; then
-      output="Latest revision is '${latestvrev}'. \
+      output="Latest released revision is '${latestvrev}'. \
       Latest status is '`get_latestvstatus "$vmajor" "$vminor" "general"`'"
     else
       output="Revision has not been released yet"
@@ -321,6 +330,19 @@ Not in a version"
     else
       output="You are not in the latest revision (which is ${latestvrev})"
     fi
+  fi
+  
+  echo $output
+  
+  # Fourth line
+  output=""
+  
+  if vcs_exist_uncommittedchanges; then
+    output="There are uncommited changes "
+  fi
+  
+  if vcs_is_branchahead; then
+    output="${output}There are unreleased commits"
   fi
   
   echo $output

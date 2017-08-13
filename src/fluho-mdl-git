@@ -256,9 +256,27 @@ vcs_get_tags ()
 }
 
 
+vcs_get_upstreambranch ()
+{
+  local localbranch=${1:-`vcs_get_currentbranch`}
+  
+  git for-each-ref --format='%(upstream:short)' "refs/heads/$localbranch" \
+    2>/dev/null # do
+  
+  # Note: if localbranch parameter not specified, it works like
+  # vcs_get_currentupstreambranch but is slower
+}
+
+
 vcs_get_currentbranch ()
 {
   git rev-parse --abbrev-ref HEAD 2>/dev/null
+}
+
+
+vcs_get_currentupstreambranch ()
+{
+  git rev-parse --abbrev-ref --symbolic-full-name @{u} 2>/dev/null
 }
 
 
@@ -293,6 +311,66 @@ vcs_get_currentcheckout ()
 } 
 
 
+vcs_exist_uncommittedchanges ()
+{
+  u="$(git ls-files --others)" && test ! -z "$u"
+  # RETURN 0 if there are uncommitted changes, 1 if not
+}
 
 
+vcs_is_branchahead ()
+{
+  local localbranch="${1:-`vcs_get_currentbranch`}"
+  local remotebranch="${2:-`vcs_get_currentupstreambranch`}"
+  
+  if [[ "$USE_REMOTE" == true ]]; then
+    echodbg "USE_REMOTE\n"
+    git rev-list --left-right ${localbranch}...${remotebranch} -- 2>/dev/null \
+    | grep --quiet '^<'
+  else
+    return 1  # If only working locally, no way to be ahead of remote
+  fi
+
+  # Note: very interesting script about branches status comparison:
+  # https://gist.github.com/Mark-Booth/5058384#file-git-branch-status 
+  
+  # RETURN 0 if branch is ahead of upstream (unpushed commits exist), 1 if not
+}
+
+
+vcs_is_branchbehind ()
+{
+  local localbranch="${1:-`vcs_get_currentbranch`}"
+  local remotebranch="${2:-`vcs_get_currentupstreambranch`}"
+  
+  if [[ "$USE_REMOTE" == true ]]; then
+    echodbg "USE_REMOTE\n"
+    git rev-list --left-right ${localbranch}...${remotebranch} -- 2>/dev/null \
+    | grep --quiet '^>'
+  else
+    return 1  # If only working locally, no way to be behind of remote
+  fi
+
+  # RETURN 0 if branch is behind of upstream (unpulled commits exist), 1 if not
+}
+
+
+vcs_is_branchdiverged ()
+{
+  local localbranch="${1:-`vcs_get_currentbranch`}"
+  local remotebranch="${2:-`vcs_get_currentupstreambranch`}"
+  
+  if [[ "$USE_REMOTE" == true ]]; then
+    echodbg "USE_REMOTE\n"
+    git rev-list --left-right ${localbranch}...${remotebranch} -- \
+    2>/dev/null | grep --quiet '^<' \
+    && git rev-list --left-right ${localbranch}...${remotebranch} -- \
+    2>/dev/null | grep --quiet '^>'
+  else
+    return 1  # If only working locally, no way to diverge from remote
+  fi
+
+  # RETURN 0 if branch has diverged from upstream (both unpushed and unpulled 
+  # commits exist), 1 if not
+}
 
