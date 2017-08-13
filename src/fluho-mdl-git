@@ -29,7 +29,7 @@ vcs_checkout ()
   if [ "$1" != "" ]; then echo "$1" | $FUNCNAME; else
     local commit=`cat`
     
-    git checkout $commit 2>/dev/null
+    git checkout $commit
   fi
 }
 
@@ -41,7 +41,7 @@ vcs_push_branch ()
     local branchname=`cat`
     
     if [ "$USE_REMOTE" == true ]; then
-      git push -u "$REMOTE_ALIAS" "$branchname" 2>/dev/null
+      git push -u "$REMOTE_ALIAS" "$branchname"
     fi
   fi
 }
@@ -57,11 +57,11 @@ vcs_create_branch ()
     
     local success=false
     
-    git branch "$branchname" "$branchbase" 2>/dev/null && success=true
+    git branch "$branchname" "$branchbase" && success=true
     
     if [[ "$success" == true && "$USE_REMOTE" == true ]]; then
       success=false
-      git push -u $REMOTE_ALIAS "$branchname" 2>/dev/null && success=true
+      git push -u $REMOTE_ALIAS "$branchname" && success=true
     fi
     
     [ "$success" == true ] && return 0 || return 1
@@ -76,11 +76,11 @@ vcs_create_lightweighttag ()
     
     local success=false
     
-    git tag "$tagname" 2>/dev/null && success=true
+    git tag "$tagname" && success=true
     
     if [[ "$success" == true && "$USE_REMOTE" == true ]]; then
       success=false
-      git push $REMOTE_ALIAS "$tagname" 2>/dev/null && success=true
+      git push $REMOTE_ALIAS "$tagname" && success=true
     fi 
 
     [ "$success" == true ] && return 0 || return 1
@@ -151,17 +151,16 @@ vcs_merge_branch_ff ()
   local success=false
     
   if [ "$dstBranch" == "" ] || [ "$dstBranch" == "$currentBranch" ]; then
-    git merge --ff-only "$srcBranch" 2>/dev/null && success=true
+    git merge --ff-only "$srcBranch" && success=true
     if [[ "$success" == true && "$USE_REMOTE" == true ]]; then
       success=false
-      git push "$REMOTE_ALIAS" "$currentBranch" 2>/dev/null && success=true
+      git push "$REMOTE_ALIAS" "$currentBranch" && success=true
     fi
   else
     git fetch . "${srcBranch}:${dstBranch}" && success=true
     if [[ "$success" == true && "$USE_REMOTE" == true ]]; then
       success=false
-      git push "${REMOTE_ALIAS}" "${dstBranch}:${dstBranch}" 2>/dev/null \
-      && success=true
+      git push "${REMOTE_ALIAS}" "${dstBranch}:${dstBranch}" && success=true
     fi
   fi
   
@@ -178,17 +177,16 @@ vcs_merge_branch_noff ()
   local success=false
     
   if [ "$dstBranch" == "" ] || [ "$dstBranch" == "$currentBranch" ]; then
-    git merge "$srcBranch" 2>/dev/null && success=true
+    git merge "$srcBranch" && success=true
     if [[ "$success" == true && "$USE_REMOTE" == true ]]; then
       success=false
-      git push "$REMOTE_ALIAS" "$currentBranch" 2>/dev/null && success=true
+      git push "$REMOTE_ALIAS" "$currentBranch" && success=true
     fi
   else
     git fetch . "${srcBranch}:${dstBranch}" && success=true
     if [[ "$success" == true && "$USE_REMOTE" == true ]]; then
       success=false
-      git push "${REMOTE_ALIAS}" "+${dstBranch}:${dstBranch}" 2>/dev/null \
-      && success=true
+      git push "${REMOTE_ALIAS}" "+${dstBranch}:${dstBranch}" && success=true
     fi
   fi
   
